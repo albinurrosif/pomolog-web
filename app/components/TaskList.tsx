@@ -12,6 +12,12 @@ interface TaskListProps {
 
 export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask }: TaskListProps) {
   const [inputValue, setInputValue] = useState('');
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
+
+  // Fungsi untuk toggle expand/collapse detail tugas
+  const toggleExpand = (id: number) => {
+    setExpandedTaskId(expandedTaskId === id ? null : id); // Tutup jika diklik lagi
+  };
 
   // Fungsi untuk menambah tugas baru
   const handleAdd = () => {
@@ -45,17 +51,32 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask 
           <p className="text-neutral-500 text-sm italic text-center py-4">Belum ada tugas di antrean.</p>
         ) : (
           todoTasks.map((task) => (
-            <div key={task.id} className="flex items-center justify-between p-4 bg-neutral-900 rounded-lg border border-neutral-700 hover:border-neutral-600 transition-colors">
-              <span className="font-medium text-white">{task.title}</span>
-              
-              <button
-                type="button"
-                onClick={() => onSelectTask(task.id)}
-                disabled={activeTaskId !== null}
-                className={`text-sm font-bold px-4 py-1.5 rounded-md transition-all ${activeTaskId !== null ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/30'}`}
-              >
-                {activeTaskId !== null ? 'TUNGGU' : '▶ PILIH TUGAS'}
-              </button>
+            <div key={task.id} className="flex flex-col p-4 bg-neutral-900 rounded-lg border border-neutral-700">
+              {/* Bagian Atas (Selalu Terlihat) */}
+              <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleExpand(task.id)}>
+                <div className="flex flex-col">
+                  <span className="font-medium text-white">{task.title}</span>
+                  {task.totalMinutesSpent > 0 && <span className="text-xs text-yellow-500">⏱️ {task.totalMinutesSpent} menit</span>}
+                </div>
+                <span>{expandedTaskId === task.id ? '▼' : '▶'}</span>
+              </div>
+
+              {/* Bagian Bawah (Tersembunyi, Muncul kalau di-klik) */}
+              {expandedTaskId === task.id && (
+                <div className="mt-4 pt-4 border-t border-neutral-800 text-sm">
+                  <p className="text-neutral-400 mb-2">{task.description ? task.description : <span className="italic">Tidak ada deskripsi.</span>}</p>
+                  <p className="text-xs text-neutral-600">
+                    Dibuat pada:{' '}
+                    {new Date(task.createdAt).toLocaleString('id-ID', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -64,10 +85,14 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask 
       {/* --- RIWAYAT SELESAI (DONE) --- */}
       {doneTasks.length > 0 && (
         <div className="space-y-3 pt-4 border-t border-neutral-800">
-          <h3 className="text-sm font-bold text-green-500 uppercase tracking-wider mb-4">Riwayat Selesai Hari Ini</h3>
+          <h3 className="text-sm font-bold text-green-500 uppercase tracking-wider mb-4">Riwayat Selesai</h3>
           {doneTasks.map((task) => (
             <div key={task.id} className="flex justify-between items-center p-4 rounded-lg border border-neutral-800 bg-neutral-900/30 opacity-60">
-              <span className="line-through text-neutral-400">{task.title}</span>
+              <div className="flex flex-col">
+                <span className="line-through text-neutral-400">{task.title}</span>
+                {/* TAMPILKAN TOTAL WAKTU FINAL */}
+                <span className="text-xs text-neutral-500 mt-1">Total Fokus: {task.totalMinutesSpent} menit</span>
+              </div>
               <span className="text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full">✓ SELESAI</span>
             </div>
           ))}

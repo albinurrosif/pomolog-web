@@ -6,7 +6,7 @@ import Timer from './components/Timer';
 import TaskList from './components/TaskList';
 import api from '@/app/lib/api';
 
-export type Task = { id: number; title: string; status: 'Todo' | 'Done' };
+export type Task = { id: number; title: string; description: string; createdAt: string; status: 'Todo' | 'Done'; totalMinutesSpent: number;};
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -18,7 +18,9 @@ export default function Home() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await api.get('/Tasks');
+        // Panggil endpoint yang baru dibuat
+        const response = await api.get('/Tasks/with-time-spent');
+        console.log('Tugas berhasil diambil:', response.data);
         setTasks(response.data);
       } catch (error) {
         console.error('Gagal mengambil tugas:', error);
