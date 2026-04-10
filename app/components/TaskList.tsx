@@ -6,8 +6,7 @@ import { Task } from '@/app/page';
 interface TaskListProps {
   tasks: Task[];
   activeTaskId: number | null;
-  // Perhatikan: Kita ubah onAddTask agar bisa menerima deskripsi
-  onAddTask: (title: string, description: string) => void;
+  onAddTask: (title: string, description: string) => Promise<boolean>;
   onSelectTask: (id: number | null) => void;
 }
 
@@ -22,11 +21,16 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask 
   };
 
   // Fungsi untuk menambahkan tugas baru
-  const handleAdd = () => {
-    if (!titleValue.trim()) return;
-    onAddTask(titleValue, descValue);
-    setTitleValue('');
-    setDescValue('');
+  const handleAdd = async () => {
+    const title = titleValue.trim();
+    const description = descValue.trim();
+    if (!title) return;
+
+    const isSuccess = await onAddTask(title, description);
+    if (isSuccess) {
+      setTitleValue('');
+      setDescValue('');
+    }
   };
 
   const todoTasks = tasks.filter((t) => t.status === 'Todo');
@@ -69,6 +73,8 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask 
             return (
               <div
                 key={task.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   if (activeTaskId === task.id) {
                     // Jika tugas ini sedang aktif dan diklik lagi -> BATALKAN (Deselect)
@@ -79,6 +85,13 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask 
                   } else {
                     // Jika ada tugas lain yang aktif
                     alert('Batalkan tugas aktif saat ini (klik ulang tugas yang bergaris merah) terlebih dahulu!');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (activeTaskId === task.id) onSelectTask(null);
+                    else if (activeTaskId === null) onSelectTask(task.id);
                   }
                 }}
                 className={`
