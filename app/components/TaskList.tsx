@@ -5,23 +5,23 @@ import { Task } from '@/app/page';
 
 interface TaskListProps {
   tasks: Task[];
-  activeTaskId: string | null;
+  activeTaskId: number | null;
   onAddTask: (title: string) => void;
-  onSelectTask: (id: string) => void;
+  onSelectTask: (id: number) => void;
 }
 
 export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask }: TaskListProps) {
   const [inputValue, setInputValue] = useState('');
 
+  // Fungsi untuk menambah tugas baru
   const handleAdd = () => {
     if (!inputValue.trim()) return;
     onAddTask(inputValue);
     setInputValue('');
   };
 
-  // Filter tugas untuk memisahkan UI
-  const todoTasks = tasks.filter(t => t.status === 'TODO');
-  const doneTasks = tasks.filter(t => t.status === 'DONE');
+  const todoTasks = tasks.filter((t) => t.status === 'Todo');
+  const doneTasks = tasks.filter((t) => t.status === 'Done');
 
   return (
     <section className="w-full bg-neutral-800/50 p-6 rounded-2xl border border-neutral-800">
@@ -48,9 +48,9 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask 
             <div key={task.id} className="flex items-center justify-between p-4 bg-neutral-900 rounded-lg border border-neutral-700 hover:border-neutral-600 transition-colors">
               <span className="font-medium text-white">{task.title}</span>
               
-              {/* Tombol Pilih dinonaktifkan jika sudah ada tugas yang aktif (Mencegah multi-tasking) */}
-              <button 
-                onClick={() => onSelectTask(task.id)} 
+              <button
+                type="button"
+                onClick={() => onSelectTask(task.id)}
                 disabled={activeTaskId !== null}
                 className={`text-sm font-bold px-4 py-1.5 rounded-md transition-all ${activeTaskId !== null ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/30'}`}
               >

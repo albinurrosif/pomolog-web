@@ -1,35 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Timer from './components/Timer';
 import TaskList from './components/TaskList';
+import api from '@/app/lib/api';
 
-// Ekspor tipe Task agar bisa dipakai di komponen lain
-export type Task = { id: string; title: string; status: 'TODO' | 'IN_PROGRESS' | 'DONE' };
+export type Task = { id: number; title: string; status: 'Todo' | 'Done' };
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  // State untuk menyimpan ID tugas yang sedang ditarik ke Timer
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
 
-  // Cari objek tugas utuh berdasarkan ID yang aktif
   const activeTask = tasks.find((t) => t.id === activeTaskId) || null;
 
-  const handleAddTask = (title: string) => {
-    setTasks([...tasks, { id: Date.now().toString(), title, status: 'TODO' }]);
+  // Ambil data tugas dari Backend saat halaman dimuat
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const response = await api.get('/Tasks');
+        setTasks(response.data);
+      } catch (error) {
+        console.error('Gagal mengambil tugas:', error);
+      }
+    };
+    fetchTasks();
+  }, []);
+
+  // Tambah Tugas Baru ke Backend
+  const handleAddTask = async (title: string) => {
+    try {
+      const response = await api.post('/Tasks', { title, description: '' });
+      // Tambahkan tugas yang dikembalikan dari server ke state
+      setTasks([...tasks, response.data]);
+    } catch (error) {
+      console.error('Gagal menambah tugas:', error);
+      alert('Gagal menambah tugas. Pastikan sesi login Anda masih aktif.');
+    }
   };
 
-  const handleSelectTask = (id: string) => {
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, status: 'IN_PROGRESS' } : t)));
+  // Pilih Tugas (Hanya state UI, tidak menembak API)
+  const handleSelectTask = (id: number) => {
     setActiveTaskId(id);
   };
 
-  const handleFinishTask = () => {
+  // Selesaikan Tugas ke Backend
+  const handleFinishTask = async () => {
     if (activeTaskId) {
-      setTasks(tasks.map((t) => (t.id === activeTaskId ? { ...t, status: 'DONE' } : t)));
-      // Kosongkan area tugas aktif agar user dipaksa mengambil tugas baru dari antrean
-      setActiveTaskId(null);
+      try {
+        await api.patch(`/Tasks/${activeTaskId}/finish`);
+        // Update state lokal agar UI langsung berubah tanpa perlu refresh
+        setTasks(tasks.map((t) => (t.id === activeTaskId ? { ...t, status: 'Done' } : t)));
+        setActiveTaskId(null);
+      } catch (error) {
+        console.error('Gagal menyelesaikan tugas:', error);
+        alert('Gagal menyelesaikan tugas.');
+      }
+    }
+  };
+
+  // Mencatat Sesi Pomodoro ke Backend
+  const handleSessionComplete = async (payload: { durationMinutes: number; tasks: { taskId: number; minutesSpent: number }[] }) => {
+    try {
+      await api.post('/Sessions', payload);
+      console.log('Sesi Pomodoro sukses dicatat di Database!');
+    } catch (error) {
+      console.error('Gagal mencatat sesi:', error);
     }
   };
 
@@ -37,11 +73,19 @@ export default function Home() {
     <div className="min-h-screen bg-neutral-900 text-white font-sans selection:bg-red-500 selection:text-white">
       <Header />
       <main className="max-w-2xl mx-auto p-6 mt-10 flex flex-col items-center gap-12">
-        {/* Mengirim data tugas aktif dan fungsi finish ke Timer */}
-        <Timer activeTask={activeTask} onFinishTask={handleFinishTask} />
+        {/* Mengirim fungsi handleSessionComplete ke Timer */}
+        <Timer 
+          activeTask={activeTask} 
+          onFinishTask={handleFinishTask} 
+          onSessionComplete={handleSessionComplete} 
+        />
 
-        {/* Mengirim daftar tugas utuh ke TaskList */}
-        <TaskList tasks={tasks} activeTaskId={activeTaskId} onAddTask={handleAddTask} onSelectTask={handleSelectTask} />
+        <TaskList 
+          tasks={tasks} 
+          activeTaskId={activeTaskId} 
+          onAddTask={handleAddTask} 
+          onSelectTask={handleSelectTask} 
+        />
       </main>
     </div>
   );
