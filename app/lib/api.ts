@@ -21,22 +21,26 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Menangani error 401 (Unauthorized) secara global
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Jika token expired/tidak valid, hapus cookie dan lempar ke login
-      Cookies.remove('token');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+    if (error.response?.status === 401) {
+      const requestUrl = error.config?.url ?? '';
+      const isAuthRequest = requestUrl.includes('/Auth/login') || requestUrl.includes('/Auth/register');
+
+      if (!isAuthRequest) {
+        Cookies.remove('token', { path: '/' });
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.assign('/login');
+        }
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;
