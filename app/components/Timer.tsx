@@ -22,7 +22,7 @@
         }
         return () => clearInterval(interval);
     }, [isActive, timeLeft, mode]);
-git 
+
     const handleSessionEnd = () => {
         setIsActive(false);
         if (mode === 'FOCUS') {
