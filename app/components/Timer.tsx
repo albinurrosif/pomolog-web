@@ -20,7 +20,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete }: T
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isActive && mode === 'FOCUS') {
         e.preventDefault();
-        e.returnValue = ''; // Browser modern butuh ini untuk memunculkan pop-up warning
+        e.returnValue = '';
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -34,7 +34,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete }: T
     // AUTO-PAUSE
     if (isActive && mode === 'FOCUS' && !activeTask) {
       setIsActive(false);
-      console.warn("Tugas hilang dari state! Timer otomatis dijeda untuk mencegah kebocoran data.");
+      alert('Tugas dilepas. Timer dijeda otomatis. Pilih tugas untuk melanjutkan sesi.');
       return;
     }
 

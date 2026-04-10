@@ -30,10 +30,9 @@ export default function Home() {
   }, []);
 
   // Tambah Tugas Baru ke Backend
-  const handleAddTask = async (title: string) => {
+  const handleAddTask = async (title: string, description: string) => {
     try {
-      const response = await api.post('/Tasks', { title, description: '' });
-      // Tambahkan tugas yang dikembalikan dari server ke state
+      const response = await api.post('/Tasks', { title, description });
       setTasks([...tasks, response.data]);
     } catch (error) {
       console.error('Gagal menambah tugas:', error);
@@ -42,7 +41,7 @@ export default function Home() {
   };
 
   // Pilih Tugas (Hanya state UI, tidak menembak API)
-  const handleSelectTask = (id: number) => {
+  const handleSelectTask = (id: number | null) => {
     setActiveTaskId(id);
   };
 
