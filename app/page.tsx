@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Timer from './components/Timer';
 import TaskList from './components/TaskList';
 import api from '@/app/lib/api';
+import { toast } from 'sonner';
 
 export type Task = { id: number; title: string; description: string; createdAt: string; status: 'Todo' | 'Done'; totalMinutesSpent: number };
 
@@ -18,12 +19,12 @@ export default function Home() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        // Panggil endpoint yang baru dibuat
         const response = await api.get('/Tasks/with-time-spent');
         console.log('Tugas berhasil diambil:', response.data);
         setTasks(response.data);
       } catch (error) {
         console.error('Gagal mengambil tugas:', error);
+        toast.error('Gagal mengambil data tugas dari server.');
       }
     };
     fetchTasks();
@@ -35,10 +36,11 @@ export default function Home() {
       const response = await api.post('/Tasks', { title, description });
       // Menggunakan fungsional updater (prev) untuk menghindari Race Condition
       setTasks((prev) => [...prev, response.data]);
+      toast.success('Tugas baru berhasil masuk antrean! 🚀');
       return true;
     } catch (error) {
       console.error('Gagal menambah tugas:', error);
-      alert('Gagal menambah tugas. Pastikan sesi login Anda masih aktif.');
+      toast.error('Gagal menambah tugas. Pastikan sesi login kamu masih aktif ya.');
       return false; // Beritahu TaskList bahwa proses gagal
     }
   };
@@ -55,9 +57,10 @@ export default function Home() {
         await api.patch(`/Tasks/${activeTaskId}/finish`);
         setTasks((prev) => prev.map((t) => (t.id === activeTaskId ? { ...t, status: 'Done' } : t)));
         setActiveTaskId(null);
+        toast.success('Mantap! Satu tugas berhasil diselesaikan. 🎉');
       } catch (error) {
         console.error('Gagal menyelesaikan tugas:', error);
-        alert('Gagal menyelesaikan tugas.');
+        toast.error('Ups, gagal menyelesaikan tugas. Server lagi sibuk nih.');
       }
     }
   };
@@ -72,7 +75,7 @@ export default function Home() {
     let didFinishCurrentTask = false;
 
     try {
-      // 1. Tembak API Selesai
+      // 1. fetch API Selesai
       await api.patch(`/Tasks/${currentId}/finish`);
       didFinishCurrentTask = true;
 
@@ -93,6 +96,7 @@ export default function Home() {
 
       // 4. Langsung aktifkan tugas baru
       setActiveTaskId(newReviewTask.id);
+      toast.success('Beralih ke mode Review. Ayo cek ulang pekerjaanmu! 🧐');
     } catch (error) {
       console.error('Gagal melakukan proses review otomatis:', error);
 
@@ -107,7 +111,7 @@ export default function Home() {
           console.error('Gagal menarik ulang data', e);
         }
       }
-      alert('Terjadi kesalahan saat membuat tugas review.');
+      toast.error('Gagal membuat tugas review otomatis.');
     }
   };
 
@@ -122,13 +126,12 @@ export default function Home() {
       setTasks(response.data);
     } catch (error) {
       console.error('Gagal mencatat sesi:', error);
+      toast.error('Gagal mencatat waktu fokusmu ke database.');
     }
   };
 
   // Hapus Tugas
   const handleDeleteTask = async (id: number) => {
-    if (!window.confirm('Yakin ingin menghapus tugas ini? Data waktu yang sudah tercatat mungkin ikut terhapus.')) return;
-
     try {
       await api.delete(`/Tasks/${id}`);
 
@@ -137,25 +140,30 @@ export default function Home() {
 
       // Jika tugas yang dihapus sedang aktif, lepaskan dari timer
       if (activeTaskId === id) setActiveTaskId(null);
+
+      toast.success('Tugas berhasil dihapus dari antrean.');
     } catch (error) {
       console.error('Gagal menghapus tugas:', error);
-      alert('Gagal menghapus tugas.');
+      toast.error('Gagal menghapus tugas. Coba lagi nanti.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white font-sans selection:bg-red-500 selection:text-white">
+    // RESPONSIVE PARENT: Di HP min-h-screen (bisa scroll), di Laptop h-screen dan overflow-hidden
+    <div className="min-h-screen lg:h-screen flex flex-col bg-background text-foreground font-sans selection:bg-primary selection:text-primary-foreground lg:overflow-hidden">
       <Header />
-      <main className="w-full px-10 mx-auto p-4 md:p-8 mt-4 md:mt-8">
-        {/* GRID: 1 Kolom di HP, 2 Kolom (Kiri-Kanan) di Layar Besar */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* KOLOM KIRI (TIMER) - Lebar 5/12 */}
-          <div className="lg:col-span-5 sticky top-24">
+
+      {/* overflow-hidden hanya aktif di Laptop */}
+      <main className="flex-1 w-full max-w-[1400px] mx-auto p-4 md:p-8 lg:overflow-hidden flex flex-col">
+        {/* GRID: 1 Kolom di HP, 2 Kolom di Laptop */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full flex-1">
+          {/* KOLOM KIRI (TIMER): Di HP mengikuti alur biasa, di Laptop mengambil tinggi penuh */}
+          <div className="lg:col-span-5 lg:h-full flex flex-col justify-start">
             <Timer activeTask={activeTask} onFinishTask={handleFinishTask} onSessionComplete={handleSessionComplete} onReviewTask={handleFinishAndReview} />
           </div>
 
-          {/* KOLOM KANAN (TASK LIST) - Lebar 7/12 */}
-          <div className="lg:col-span-7">
+          {/* KOLOM KANAN (TASK LIST): Di HP memanjang ke bawah biasa, di Laptop menjadi Internal Scroll */}
+          <div className="lg:col-span-7 lg:h-full lg:overflow-y-auto custom-scrollbar pb-10 pr-2">
             <TaskList tasks={tasks} activeTaskId={activeTaskId} onAddTask={handleAddTask} onSelectTask={handleSelectTask} onDeleteTask={handleDeleteTask} />
           </div>
         </div>

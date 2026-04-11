@@ -2,6 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { Task } from '@/app/page';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface TimerProps {
   activeTask: Task | null;
@@ -40,7 +45,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
     // AUTO-PAUSE
     if (isActive && mode === 'FOCUS' && !activeTask) {
       setIsActive(false);
-      alert('Tugas dilepas. Timer dijeda otomatis. Pilih tugas untuk melanjutkan sesi.');
+      toast.info('Task dilepas. Timer dijeda otomatis. Pilih task lain untuk melanjutkan.');
       return;
     }
 
@@ -71,28 +76,27 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
         minutesSpent: Math.max(1, Math.round(seconds / 60)),
       }));
 
-      console.log('MENGIRIM SESI KE BACKEND:', tasksPayload);
-
       if (tasksPayload.length > 0) {
         onSessionComplete({
           durationMinutes: 25,
           tasks: tasksPayload,
         });
       } else {
-        console.error('Gagal mengirim sesi: Tidak ada waktu yang tercatat untuk tugas apapun.');
+        console.error('Gagal mengirim sesi: Tidak ada waktu yang tercatat.');
       }
 
       if (activeTask && activeTask.title.startsWith('Review: ')) {
-        await onFinishTask(); // finish review task
-        alert('Sesi selesai! Tugas Review otomatis ditandai selesai.');
+        await onFinishTask();
+        toast.success('Sesi selesai. Task Review otomatis ditandai Done.');
       } else {
-        alert('Sesi Fokus Selesai! Kamu dapat 25 menit di Analytics.');
+        toast.success('Sesi Fokus Selesai. 25 menit ditambahkan ke Analytics.');
       }
+
       setMode('BREAK');
       setTimeLeft(BREAK_DURATION);
       setTaskTimeLog({});
     } else {
-      alert('Waktu Istirahat Habis! Siap kerja lagi?');
+      toast.info('Waktu istirahat habis. Siap untuk sprint berikutnya?');
       setMode('FOCUS');
       setTimeLeft(FOCUS_DURATION);
     }
@@ -100,14 +104,11 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
 
   // LOGIKA TOMBOL SELESAI (EARLY FINISH)
   const handleCompleteButtonClick = async () => {
-    // Cegah klik ganda saat proses sedang berjalan
     if (isSubmitting) return;
 
-    // Jika timer masih memiliki sisa waktu dan kita sedang mode Fokus
     if (timeLeft > 0 && timeLeft < FOCUS_DURATION && mode === 'FOCUS') {
       setShowEarlyFinishModal(true);
     } else {
-      // Proses selesai normal tanpa modal
       setIsSubmitting(true);
       try {
         await onFinishTask();
@@ -120,7 +121,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
   // LOGIKA TOMBOL START/PAUSE
   const handleStartPause = () => {
     if (mode === 'FOCUS' && !activeTask && !isActive) {
-      alert('Pilih tugas terlebih dahulu dari antrean di bawah untuk melanjutkan sesi!');
+      toast.info('Pilih task dari Backlog terlebih dahulu.');
       return;
     }
     setIsActive(!isActive);
@@ -133,7 +134,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
       setMode('FOCUS');
       setTimeLeft(FOCUS_DURATION);
     } else {
-      if (window.confirm('Batalkan sesi ini? Waktu fokus tidak akan dicatat.')) {
+      if (window.confirm('Batalkan sesi ini? Waktu fokus tidak akan dicatat ke Analytics.')) {
         setIsActive(false);
         setMode('FOCUS');
         setTimeLeft(FOCUS_DURATION);
@@ -142,7 +143,6 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
     }
   };
 
-  // FUNGSI BANTU UNTUK MENCEGAH KLIK GANDA SAAT PROSES ASINKRON BERJALAN
   const runWithSubmitLock = async (action: () => Promise<void>) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -160,97 +160,121 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
   };
 
   return (
-    <section className="flex flex-col items-center gap-6 w-full">
-      <div className="text-xl font-bold tracking-widest uppercase">{mode === 'FOCUS' ? <span className="text-red-500">🔥 Sesi Fokus</span> : <span className="text-green-500">☕ Istirahat</span>}</div>
-
-      <div className={`w-64 h-64 rounded-full border-8 flex items-center justify-center shadow-2xl transition-all duration-500 ${mode === 'FOCUS' ? 'border-red-500 shadow-red-500/20' : 'border-green-500 shadow-green-500/20'}`}>
-        <span className="text-6xl font-mono font-bold">{formatTime(timeLeft)}</span>
+    <section className="flex flex-col items-center gap-8 w-full pt-0 mt-0">
+      {/* LABEL MODE */}
+      <div className="flex flex-col items-center gap-2">
+        <h2 className={`text-sm font-bold tracking-[0.2em] uppercase ${mode === 'FOCUS' ? 'text-primary' : 'text-green-500'}`}>{mode === 'FOCUS' ? 'FOCUS SESSION' : 'SHORT BREAK'}</h2>
       </div>
 
-      {/* --- AREA TUGAS AKTIF --- */}
-      <div className="flex flex-col items-center justify-center min-h-[90px] w-full max-w-md bg-neutral-800/30 rounded-xl p-4 border border-neutral-700/50 text-center">
-        {mode === 'BREAK' ? (
-          <p className="text-neutral-400 text-sm">Jauhkan mata dari layar dan regangkan badan.</p>
-        ) : activeTask ? (
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-neutral-400 text-xs">Sedang Dikerjakan:</span>
-            <span className="font-bold text-lg text-white">{activeTask.title}</span>
-
-            {(isActive || (taskTimeLog[activeTask.id] || 0) > 0) && (
-              <button onClick={handleCompleteButtonClick} className="mt-1 text-xs bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-white px-4 py-1.5 rounded-full transition-colors font-medium border border-green-500/30">
-                ✓ Tandai Tugas Selesai
-              </button>
-            )}
-          </div>
-        ) : timeLeft < FOCUS_DURATION ? (
-          <p className="text-yellow-500 text-sm font-medium animate-pulse">Sisa sesi masih ada! Pilih tugas baru di bawah untuk melanjutkan.</p>
-        ) : (
-          <p className="text-neutral-400 text-sm italic">Belum ada tugas aktif. Silakan pilih di bawah.</p>
-        )}
+      {/* LINGKARAN TIMER (Diperbesar & Ditebalkan) */}
+      <div
+        className={`
+    relative flex items-center justify-center
+    w-[22rem] h-[22rem] rounded-full
+    border-[16px] shadow-2xl
+    transition-all duration-700
+    ${mode === 'FOCUS' ? 'border-primary shadow-primary/30 bg-background' : 'border-green-500 shadow-green-500/30 bg-background'}
+  `}
+      >
+        <span className="text-8xl font-mono font-black tracking-tighter text-foreground">{formatTime(timeLeft)}</span>
       </div>
 
-      <div className="flex gap-4">
+      {/* AREA TASK AKTIF */}
+      <Card className="w-full max-w-sm bg-card/50 border-border">
+        <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px] text-center gap-3">
+          {mode === 'BREAK' ? (
+            <p className="text-muted-foreground text-sm font-medium">Jauhkan mata dari layar dan regangkan badan.</p>
+          ) : activeTask ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Task</span>
+                <span className="font-bold text-xl text-foreground leading-tight">{activeTask.title}</span>
+              </div>
+
+              {(isActive || (taskTimeLog[activeTask.id] || 0) > 0) && (
+                <Button onClick={handleCompleteButtonClick} disabled={isSubmitting} variant="outline" size="sm" className="mt-2 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-white transition-all font-bold">
+                  Tandai Selesai
+                </Button>
+              )}
+            </>
+          ) : timeLeft < FOCUS_DURATION ? (
+            <p className="text-amber-500 text-sm font-medium animate-pulse">Sesi masih berjalan. Pilih task baru untuk melanjutkan.</p>
+          ) : (
+            <p className="text-muted-foreground text-sm italic">Belum ada task yang dipilih.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* TOMBOL KONTROL UTAMA */}
+      <div className="flex gap-4 w-full max-w-sm">
         {mode === 'BREAK' && isActive ? (
-          <button disabled className="bg-neutral-800 text-neutral-500 px-8 py-3 rounded-full font-bold text-lg cursor-not-allowed w-48">
+          <Button disabled className="flex-1 h-14 text-lg font-bold uppercase tracking-wider">
             BERJALAN...
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             onClick={handleStartPause}
-            className={`px-8 py-3 rounded-full font-bold text-lg transition-all w-48 ${isActive ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : mode === 'FOCUS' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+            className={`flex-1 h-14 text-lg font-bold uppercase tracking-wider transition-all shadow-lg ${isActive ? 'bg-amber-500 hover:bg-amber-600 text-black shadow-amber-500/20' : mode === 'FOCUS' ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20' : 'bg-green-600 hover:bg-green-700 text-white shadow-green-500/20'}`}
           >
-            {isActive ? 'PAUSE' : mode === 'FOCUS' ? (timeLeft < FOCUS_DURATION ? 'RESUME' : 'START FOKUS') : 'MULAI ISTIRAHAT'}
-          </button>
+            {isActive ? 'PAUSE' : mode === 'FOCUS' ? (timeLeft < FOCUS_DURATION ? 'RESUME' : 'START SPRINT') : 'START BREAK'}
+          </Button>
         )}
 
         {mode === 'BREAK' ? (
-          <button onClick={handleResetOrSkip} className="bg-neutral-800 px-8 py-3 rounded-full font-bold text-lg hover:text-green-400 transition-colors">
-            LEWATI
-          </button>
+          <Button variant="secondary" onClick={handleResetOrSkip} className="h-14 px-8 font-bold text-muted-foreground hover:text-foreground">
+            SKIP
+          </Button>
         ) : (
           timeLeft < FOCUS_DURATION && (
-            <button onClick={handleResetOrSkip} className="bg-neutral-800 px-8 py-3 rounded-full font-bold text-lg hover:text-red-400 transition-colors">
+            <Button variant="secondary" onClick={handleResetOrSkip} className="h-14 px-8 font-bold text-muted-foreground hover:text-destructive">
               RESET
-            </button>
+            </Button>
           )
         )}
       </div>
-      {/* --- MODAL EARLY FINISH --- */}
-      {showEarlyFinishModal && activeTask && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50 p-4">
-          <div className="bg-neutral-900 border border-neutral-700 p-6 rounded-2xl max-w-sm text-center shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-2">Kerja Cepat! ⚡</h3>
-            <p className="text-neutral-400 text-sm mb-6">
-              Tugas selesai, tapi pantang menyerah sebelum 25 menit. Sisa waktu: <span className="text-yellow-500 font-bold">{formatTime(timeLeft)}</span>. Apa yang ingin kamu lakukan selanjutnya?
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={async () => {
-                  await onFinishTask(); // Selesaikan tugas lama
-                  setShowEarlyFinishModal(false); // Tutup modal
-                  // Auto-pause akan menyala otomatis karena activeTask jadi null
-                }}
-                className="bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 py-3 rounded-lg font-bold transition-colors text-sm"
+
+      {/* SHADCN DIALOG: EARLY FINISH */}
+      <Dialog open={showEarlyFinishModal} onOpenChange={(open) => !open && setShowEarlyFinishModal(false)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Selesai Lebih Awal?</DialogTitle>
+            <DialogDescription className="pt-2 text-sm">
+              Task sudah selesai, tapi sisa waktu masih <span className="text-amber-500 font-bold">{formatTime(timeLeft)}</span>. Pantang menyerah sebelum 25 menit. Apa langkah selanjutnya?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 mt-4">
+            <Button
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() =>
+                runWithSubmitLock(async () => {
+                  await onFinishTask();
+                  setShowEarlyFinishModal(false);
+                })
+              }
+              className="h-12 font-semibold"
+            >
+              Pilih Task Lain Manual
+            </Button>
+
+            {!activeTask?.title.startsWith('Review: ') && (
+              <Button
+                disabled={isSubmitting}
+                onClick={() =>
+                  runWithSubmitLock(async () => {
+                    await onReviewTask();
+                    setShowEarlyFinishModal(false);
+                  })
+                }
+                className="h-12 font-bold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
               >
-                Lanjut Tugas Lain (Pilih Manual)
-              </button>
-              {!activeTask.title.startsWith('Review: ') && (
-                <button
-                  onClick={() =>
-                    runWithSubmitLock(async () => {
-                      await onReviewTask();
-                      setShowEarlyFinishModal(false);
-                    })
-                  }
-                  className="bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-bold transition-colors text-sm shadow-lg shadow-red-500/20"
-                >
-                  Review Pekerjaan Ini
-                </button>
-              )}
-            </div>
+                Review Pekerjaan Ini
+              </Button>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

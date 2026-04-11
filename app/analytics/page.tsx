@@ -1,39 +1,53 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Header from '../components/Header';
 import api from '../lib/api';
 import { Task } from '@/app/page';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+// SHADCN COMPONENTS
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+
+// RECHARTS COMPONENTS (Menambahkan Rectangle sesuai dokumentasi Shadcn)
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine, Rectangle } from 'recharts';
+
+// KONFIGURASI CHART
+const chartConfig = {
+  totalMinutes: {
+    label: 'Total Waktu',
+    color: '#ef4444', // Merah Tomat
+  },
+} satisfies ChartConfig;
 
 export default function AnalyticsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [summary, setSummary] = useState({ totalTasksCompleted: 0, totalSessionsCompleted: 0, totalFocusTimeMinutes: 0 });
-  const [chartData, setChartData] = useState([]);
-  const [timeRange, setTimeRange] = useState('weekly');
+  const [chartData, setChartData] = useState<any[]>([]);
+
+  const [timeRange, setTimeRange] = useState<'weekly' | 'monthly'>('weekly');
+  const [chartType, setChartType] = useState<'bar' | 'area'>('bar');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // FETCH DATA
+  // --- API FETCHING ---
   useEffect(() => {
     const fetchAnalytics = async () => {
       setIsLoading(true);
+      setErrorMessage(null);
       try {
-        // Ambil data untuk list "Top 5 Tugas"
-        const tasksRes = await api.get('/Tasks/with-time-spent');
-        setTasks(tasksRes.data);
+        const [tasksRes, summaryRes, chartRes] = await Promise.all([api.get('/Tasks/with-time-spent'), api.get('/Analytics/summary'), api.get(`/Analytics/${timeRange}`)]);
 
-        // Ambil data untuk 3 Kartu Ringkasan (Summary)
-        const summaryRes = await api.get('/Analytics/summary');
+        setTasks(tasksRes.data);
         setSummary(summaryRes.data);
 
-        // Ambil data untuk Grafik Batang (Weekly / Monthly)
-        const chartRes = await api.get(`/Analytics/${timeRange}`);
-        // Balik array-nya agar urutan di grafik dari kiri (lampau) ke kanan (terbaru)
-        const sortedChartData = chartRes.data.reverse();
-        setChartData(sortedChartData);
+        // Hanya di-reverse, TANPA manipulasi fill color manual
+        const sortedData = [...chartRes.data].reverse();
+        setChartData(sortedData);
       } catch (error) {
         console.error('Gagal memuat analitik:', error);
+        setErrorMessage('Gagal menarik data dari server. Pastikan koneksi Anda stabil.');
       } finally {
         setIsLoading(false);
       }
@@ -41,118 +55,265 @@ export default function AnalyticsPage() {
     fetchAnalytics();
   }, [timeRange]);
 
-  // LOGIKA UNTUK TOP 5 TUGAS SAJA
-  const topTasks = [...tasks]
-    .filter((t) => t.totalMinutesSpent > 0)
-    .sort((a, b) => b.totalMinutesSpent - a.totalMinutesSpent)
-    .slice(0, 5);
+  // --- DATA CALCULATIONS ---
+  const topTasks = useMemo(() => {
+    return [...tasks]
+      .filter((t) => t.totalMinutesSpent > 0)
+      .sort((a, b) => b.totalMinutesSpent - a.totalMinutesSpent)
+      .slice(0, 5);
+  }, [tasks]);
 
-  const totalHoursFormatted = (summary.totalFocusTimeMinutes / 60).toFixed(1);
+  const formattedFocusTime = useMemo(() => {
+    const totalMinutes = summary.totalFocusTimeMinutes;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours > 0) {
+      return (
+        <div className="flex items-baseline gap-1 mt-1">
+          <span className="text-4xl font-black text-amber-500">{hours}</span>
+          <span className="text-sm font-bold text-muted-foreground mr-1">j</span>
+          <span className="text-4xl font-black text-amber-500">{minutes}</span>
+          <span className="text-sm font-bold text-muted-foreground">m</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-baseline gap-2 mt-1">
+        <span className="text-4xl font-black text-amber-500">{minutes}</span>
+        <span className="text-sm font-bold text-muted-foreground">MENIT</span>
+      </div>
+    );
+  }, [summary.totalFocusTimeMinutes]);
+
+  const renderTomatoes = (minutes: number) => {
+    if (minutes < 25) return null;
+    const tomatoCount = Math.floor(minutes / 25);
+    return (
+      <span className="ml-2 text-sm tracking-widest" title={`${tomatoCount} Sesi Selesai`}>
+        {Array.from({ length: tomatoCount })
+          .map(() => '🍅')
+          .join('')}
+      </span>
+    );
+  };
+
+  const todayKey = chartData.length > 0 ? chartData[chartData.length - 1][timeRange === 'weekly' ? 'dayName' : 'date'] : undefined;
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white font-sans selection:bg-red-500 selection:text-white">
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-primary-foreground">
       <Header />
-      <main className="max-w-7xl mx-auto p-4 md:p-6 mt-6 flex flex-col gap-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-wider mb-2">Analitik Fokus 📊</h1>
-            <p className="text-neutral-400">Pahami ke mana waktu Anda dihabiskan.</p>
+      <main className="max-w-6xl mx-auto p-4 md:p-8 mt-4 md:mt-8 flex flex-col gap-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-3xl font-bold tracking-wider uppercase">Analytics</h1>
+            <p className="text-muted-foreground text-sm font-medium">Visualisasi dedikasi dan distribusi waktu fokus Anda.</p>
           </div>
 
-          {/* TOMBOL FILTER MINGGUAN / BULANAN */}
-          <div className="flex bg-neutral-800 p-1 rounded-lg border border-neutral-700 w-fit">
-            <button onClick={() => setTimeRange('weekly')} className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${timeRange === 'weekly' ? 'bg-red-500 text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}>
+          <div className="flex bg-muted/50 p-1 rounded-lg border border-border w-fit">
+            <Button variant={timeRange === 'weekly' ? 'default' : 'ghost'} size="sm" onClick={() => setTimeRange('weekly')} className="font-bold px-6">
               7 Hari
-            </button>
-            <button onClick={() => setTimeRange('monthly')} className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${timeRange === 'monthly' ? 'bg-red-500 text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}>
+            </Button>
+            <Button variant={timeRange === 'monthly' ? 'default' : 'ghost'} size="sm" onClick={() => setTimeRange('monthly')} className="font-bold px-6">
               30 Hari
-            </button>
+            </Button>
           </div>
         </div>
 
         {isLoading ? (
-          <p className="text-neutral-500 animate-pulse py-10 text-center">Menarik data dari database...</p>
+          <p className="text-muted-foreground animate-pulse py-12 text-center font-medium">Mengkalkulasi metrik...</p>
         ) : errorMessage ? (
-          <p className="text-red-500 text-center py-8">{errorMessage}</p>
+          <p className="text-destructive text-center py-12 font-bold">{errorMessage}</p>
         ) : (
-          <>
-            {/* KARTU RINGKASAN (Menggunakan data dari /api/Analytics/summary) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-neutral-800/50 p-6 rounded-2xl border border-neutral-700">
-                <p className="text-neutral-400 text-sm font-bold uppercase tracking-wider mb-1">Total Jam Fokus</p>
-                <p className="text-4xl font-bold text-yellow-500">
-                  {totalHoursFormatted} <span className="text-lg text-neutral-500">jam</span>
-                </p>
-              </div>
-              <div className="bg-neutral-800/50 p-6 rounded-2xl border border-neutral-700">
-                <p className="text-neutral-400 text-sm font-bold uppercase tracking-wider mb-1">Tugas Diselesaikan</p>
-                <p className="text-4xl font-bold text-green-500">
-                  {summary.totalTasksCompleted} <span className="text-lg text-neutral-500">tugas</span>
-                </p>
-              </div>
-              <div className="bg-neutral-800/50 p-6 rounded-2xl border border-neutral-700">
-                <p className="text-neutral-400 text-sm font-bold uppercase tracking-wider mb-1">Total Sesi Pomodoro</p>
-                <p className="text-4xl font-bold text-white">
-                  {summary.totalSessionsCompleted} <span className="text-lg text-neutral-500">sesi</span>
-                </p>
-              </div>
+          <div className="flex flex-col gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-card/50 border-border">
+                <CardContent className="p-6 flex flex-col gap-1">
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wider">Total Waktu Fokus</span>
+                  {formattedFocusTime}
+                </CardContent>
+              </Card>
+              <Card className="bg-card/50 border-border">
+                <CardContent className="p-6 flex flex-col gap-1">
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wider">Task Selesai</span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-4xl font-black text-foreground">{summary.totalTasksCompleted}</span>
+                    <span className="text-sm font-bold text-muted-foreground">TASK</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-card/50 border-border">
+                <CardContent className="p-6 flex flex-col gap-1">
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wider">Total Sesi</span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-4xl font-black text-foreground">{summary.totalSessionsCompleted}</span>
+                    <span className="text-sm font-bold text-muted-foreground">POMODORO</span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* GRAFIK & TOP TASKS */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* GRAFIK MINGGUAN/BULANAN */}
-              <div className="bg-neutral-800/50 p-6 rounded-2xl border border-neutral-700 h-96 flex flex-col">
-                <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-6">Tren Fokus ({timeRange === 'weekly' ? '7 Hari' : '30 Hari'} Terakhir)</h3>
-                <div className="flex-1 min-h-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      {/* Sumbu X sekarang menggunakan dayName (Sen, Sel, Rab...) atau Date */}
-                      <XAxis dataKey={timeRange === 'weekly' ? 'dayName' : 'date'} stroke="#525252" fontSize={10} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#525252" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        cursor={{ fill: '#262626' }}
-                        contentStyle={{ backgroundColor: '#525252', border: '1px solid #404040', borderRadius: '8px' }}
-                        formatter={(value: any) => [`${value} Menit`, 'Fokus']}
-                        labelFormatter={(label) => `Tanggal/Hari: ${label}`}
-                      />
-                      {/* Sumbu Y sekarang menggunakan totalMinutes dari API baru */}
-                      <Bar dataKey="totalMinutes" radius={[4, 4, 0, 0]}>
-                        {chartData.map((entry: any, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            // Warnai merah untuk hari dengan fokus tertinggi, sisanya kuning
-                            fill={entry.totalMinutes === Math.max(...chartData.map((d: any) => d.totalMinutes)) && entry.totalMinutes > 0 ? '#ef4444' : '#eab308'}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-7 gap-8">
+              <Card className="lg:col-span-4 bg-card/50 border-border flex flex-col">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
+                  <div className="flex flex-col gap-1">
+                    <CardTitle className="uppercase tracking-wider text-sm">Tren Fokus ({timeRange === 'weekly' ? '7 Hari' : '30 Hari'})</CardTitle>
+                    <CardDescription>Masa lalu di kiri, hari ini di kanan.</CardDescription>
+                  </div>
 
-              {/* FOKUS TERBESAR (Top 5 Tasks) */}
-              <div className="bg-neutral-800/50 p-6 rounded-2xl border border-neutral-700">
-                <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-6">fokus tertinggi</h3>
-                {topTasks.length === 0 ? (
-                  <p className="text-neutral-500 italic text-sm">Belum ada data tugas yang diselesaikan.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {topTasks.map((task, i) => (
-                      <div key={task.id} className="flex items-center justify-between p-3 bg-neutral-900 rounded-lg border border-neutral-800">
-                        <div className="flex items-center gap-4">
-                          <span className={`font-bold text-xl ${i === 0 ? 'text-red-500' : 'text-neutral-600'}`}>#{i + 1}</span>
-                          <div className="flex flex-col">
-                            <span className="text-white font-medium truncate max-w-[180px] sm:max-w-[250px]">{task.title}</span>
+                  <div className="flex bg-muted/50 p-1 rounded-md border border-border">
+                    <Button variant={chartType === 'bar' ? 'secondary' : 'ghost'} size="sm" onClick={() => setChartType('bar')} className="h-7 px-3 text-xs font-bold">
+                      Bar
+                    </Button>
+                    <Button variant={chartType === 'area' ? 'secondary' : 'ghost'} size="sm" onClick={() => setChartType('area')} className="h-7 px-3 text-xs font-bold">
+                      Area
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 min-h-[300px] mt-4">
+                  <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                    {chartType === 'bar' ? (
+                      <BarChart accessibilityLayer data={chartData} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
+                        <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+
+                        <XAxis
+                          dataKey={timeRange === 'weekly' ? 'dayName' : 'date'}
+                          tickLine={false}
+                          tickMargin={10}
+                          axisLine={false}
+                          minTickGap={20}
+                          tickFormatter={(value) => {
+                            if (timeRange === 'weekly') return value;
+                            return new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+                          }}
+                        />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={10} tickFormatter={(value) => `${value}m`} />
+
+                        <ChartTooltip
+                          cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+                          content={
+                            <ChartTooltipContent
+                              hideLabel={false}
+                              formatter={(value, name, item) => {
+                                // 💡 ALAT PENYADAP (DEBUGGING)
+                                // Buka Inspect Element -> tab "Console" di browser Anda
+                                // Perhatikan apa saja isi dari item.payload saat Anda me-hover grafik
+                                console.log('Isi Payload dari Backend:', item.payload);
+
+                                return (
+                                  <>
+                                    <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: `var(--color-totalMinutes)` }} />
+                                    <span className="text-muted-foreground">{chartConfig[name as keyof typeof chartConfig]?.label || name}</span>
+
+                                    <div className="ml-auto flex items-baseline gap-3 font-mono font-medium text-foreground tabular-nums">
+                                      {/* Menit Fokus */}
+                                      <div className="flex items-baseline gap-1">
+                                        {value} <span className="font-normal text-muted-foreground font-sans text-xs">menit</span>
+                                      </div>
+
+                                      {/* Jumlah Sesi Pomodoro */}
+                                      {item.payload.sessionCount !== undefined && (
+                                        <div className="flex items-baseline gap-1 border-l border-border pl-3">
+                                          {item.payload.sessionCount} <span className="font-normal text-muted-foreground font-sans text-[10px] uppercase tracking-wider">sesi</span>
+                                        </div>
+                                      )}
+
+                                      {/* Jumlah Task Selesai */}
+                                      {item.payload.tasksCompleted !== undefined && (
+                                        <div className="flex items-baseline gap-1 border-l border-border pl-3">
+                                          {item.payload.tasksCompleted} <span className="font-normal text-muted-foreground font-sans text-[10px] uppercase tracking-wider">task</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
+                                );
+                              }}
+                            />
+                          }
+                        />
+                        <Bar
+                          dataKey="totalMinutes"
+                          fill="#ef4444"
+                          radius={[4, 4, 0, 0]}
+                          shape={(props: any) => {
+                            const isToday = props.index === chartData.length - 1;
+                            return <Rectangle {...props} fillOpacity={isToday ? 1 : 0.4} />;
+                          }}
+                        />
+                      </BarChart>
+                    ) : (
+                      <AreaChart accessibilityLayer data={chartData} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
+                        <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+
+                        <XAxis
+                          dataKey={timeRange === 'weekly' ? 'dayName' : 'date'}
+                          tickLine={false}
+                          tickMargin={10}
+                          axisLine={false}
+                          minTickGap={20}
+                          tickFormatter={(value) => {
+                            if (timeRange === 'weekly') return value;
+                            return new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+                          }}
+                        />
+                        <YAxis tickLine={false} axisLine={false} tickMargin={10} tickFormatter={(value) => `${value}m`} />
+
+                        <ChartTooltip
+                          cursor={false}
+                          content={
+                            <ChartTooltipContent
+                              hideLabel={false}
+                              formatter={(value, name) => (
+                                <>
+                                  <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: `var(--color-${name})` }} />
+                                  {chartConfig[name as keyof typeof chartConfig]?.label || name}
+                                  <div className="ml-auto flex items-baseline gap-1 font-mono font-medium text-foreground tabular-nums">
+                                    {value}
+                                    <span className="font-normal text-muted-foreground">menit</span>
+                                  </div>
+                                </>
+                              )}
+                            />
+                          }
+                        />
+
+                        <Area type="monotone" dataKey="totalMinutes" stroke="var(--color-totalMinutes)" strokeWidth={3} fill="var(--color-totalMinutes)" fillOpacity={0.2} />
+
+                        {todayKey && <ReferenceLine x={todayKey} stroke="var(--color-totalMinutes)" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: 'Hari Ini', fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} />}
+                      </AreaChart>
+                    )}
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-3 bg-card/50 border-border">
+                <CardHeader>
+                  <CardTitle className="uppercase tracking-wider text-sm">Top Time Thieves</CardTitle>
+                  <CardDescription>Task yang paling banyak menyita waktu.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {topTasks.length === 0 ? (
+                    <p className="text-muted-foreground italic text-sm py-4">Belum ada rekam jejak fokus.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {topTasks.map((task, i) => (
+                        <div key={task.id} className="flex items-center justify-between p-3 bg-background rounded-lg border border-border transition-colors hover:border-primary/30 group">
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <span className={`font-black text-lg ${i === 0 ? 'text-primary' : 'text-muted-foreground/50'}`}>#{i + 1}</span>
+                            <span className="text-foreground font-semibold truncate group-hover:text-primary transition-colors">{task.title}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {renderTomatoes(task.totalMinutesSpent)}
+                            <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20">{task.totalMinutesSpent}m</span>
                           </div>
                         </div>
-                        <span className="text-yellow-500 text-sm font-bold bg-yellow-500/10 px-3 py-1 rounded-full">{task.totalMinutesSpent} menit</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>
