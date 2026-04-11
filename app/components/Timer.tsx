@@ -109,8 +109,11 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
     } else {
       // Proses selesai normal tanpa modal
       setIsSubmitting(true);
-      try { await onFinishTask(); }
-      finally { setIsSubmitting(false); }
+      try {
+        await onFinishTask();
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -136,6 +139,17 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
         setTimeLeft(FOCUS_DURATION);
         setTaskTimeLog({});
       }
+    }
+  };
+
+  // FUNGSI BANTU UNTUK MENCEGAH KLIK GANDA SAAT PROSES ASINKRON BERJALAN
+  const runWithSubmitLock = async (action: () => Promise<void>) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await action();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -222,10 +236,12 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
               </button>
               {!activeTask.title.startsWith('Review: ') && (
                 <button
-                  onClick={async () => {
-                    await onReviewTask();
-                    setShowEarlyFinishModal(false);
-                  }}
+                  onClick={() =>
+                    runWithSubmitLock(async () => {
+                      await onReviewTask();
+                      setShowEarlyFinishModal(false);
+                    })
+                  }
                   className="bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-bold transition-colors text-sm shadow-lg shadow-red-500/20"
                 >
                   Review Pekerjaan Ini

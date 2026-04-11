@@ -12,6 +12,7 @@ export default function AnalyticsPage() {
   const [chartData, setChartData] = useState([]);
   const [timeRange, setTimeRange] = useState('weekly');
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // FETCH DATA
   useEffect(() => {
@@ -29,9 +30,8 @@ export default function AnalyticsPage() {
         // Ambil data untuk Grafik Batang (Weekly / Monthly)
         const chartRes = await api.get(`/Analytics/${timeRange}`);
         // Balik array-nya agar urutan di grafik dari kiri (lampau) ke kanan (terbaru)
-        const sortedChartData = chartRes.data.reverse(); 
+        const sortedChartData = chartRes.data.reverse();
         setChartData(sortedChartData);
-
       } catch (error) {
         console.error('Gagal memuat analitik:', error);
       } finally {
@@ -43,7 +43,7 @@ export default function AnalyticsPage() {
 
   // LOGIKA UNTUK TOP 5 TUGAS SAJA
   const topTasks = [...tasks]
-    .filter(t => t.totalMinutesSpent > 0)
+    .filter((t) => t.totalMinutesSpent > 0)
     .sort((a, b) => b.totalMinutesSpent - a.totalMinutesSpent)
     .slice(0, 5);
 
@@ -72,6 +72,8 @@ export default function AnalyticsPage() {
 
         {isLoading ? (
           <p className="text-neutral-500 animate-pulse py-10 text-center">Menarik data dari database...</p>
+        ) : errorMessage ? (
+          <p className="text-red-500 text-center py-8">{errorMessage}</p>
         ) : (
           <>
             {/* KARTU RINGKASAN (Menggunakan data dari /api/Analytics/summary) */}
