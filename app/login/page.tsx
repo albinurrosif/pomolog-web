@@ -4,12 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import api from '../lib/api';
+import { toast } from 'sonner';
+
+// Import Shadcn Components
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
 
   // Form State
   const [name, setName] = useState('');
@@ -18,120 +24,98 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
     setIsLoading(true);
 
     try {
       if (isLogin) {
         // --- PROSES LOGIN ---
         const response = await api.post('/Auth/login', { email, password });
-        
-        // Simpan token ke cookie (response.data.token)
-        const token = response.data.token; 
+        const token = response.data.token;
+
         if (token) {
           Cookies.set('token', token, { expires: 7 });
-          router.push('/'); // halaman utama
+          toast.success('Login berhasil! Selamat datang kembali. 🚀');
+          router.push('/');
         } else {
-          setErrorMsg('Token tidak ditemukan dari server.');
+          toast.error('Token tidak ditemukan dari server.');
         }
-
       } else {
         // --- PROSES REGISTER ---
         await api.post('/Auth/register', { name, email, password });
-        
-        alert('Registrasi sukses! Silakan login.');
-        setIsLogin(true); // Pindah ke login
+
+        toast.success('Registrasi sukses! Silakan login dengan akun barumu.');
+        setIsLogin(true);
         setPassword('');
       }
     } catch (error: any) {
-      setErrorMsg(
-        error.response?.data?.message || error.response?.data || 'Terjadi kesalahan pada server.'
-      );
+      const errorMsg = error.response?.data?.message || error.response?.data || 'Terjadi kesalahan pada server.';
+      // Menggunakan Sonner Toast alih-alih div merah kaku
+      toast.error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-4 font-sans text-white">
-      <div className="w-full max-w-md bg-neutral-800 p-8 rounded-2xl border border-neutral-700 shadow-2xl">
-        <div className="text-center mb-8">
-          <span className="text-5xl">🍅</span>
-          <h1 className="text-2xl font-bold mt-4 tracking-wider">POMOLOG</h1>
-          <p className="text-neutral-400 mt-2">
-            {isLogin ? 'Selamat datang kembali, fokus lagi yuk!' : 'Mulai perjalanan fokusmu hari ini.'}
-          </p>
-        </div>
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4 font-sans selection:bg-primary selection:text-primary-foreground">
+      {/* Efek Glow di belakang Card (Opsional, memberikan kesan premium) */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/20 blur-[120px] rounded-full pointer-events-none" />
 
-        {errorMsg && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-3 rounded-lg mb-6 text-sm text-center">
-            {typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg)}
+      <Card className="w-full max-w-md bg-card/50 backdrop-blur-xl border-border shadow-2xl relative z-10">
+        <CardHeader className="text-center space-y-2 pb-6">
+          <div className="flex justify-center mb-2">
+            <span className="text-5xl drop-shadow-lg">🍅</span>
           </div>
-        )}
+          <CardTitle className="text-2xl font-bold tracking-widest uppercase">POMOLOG</CardTitle>
+          <CardDescription className="text-sm font-medium">{isLogin ? 'Selamat datang kembali, mari mulai fokus.' : 'Mulai perjalanan produktivitasmu hari ini.'}</CardDescription>
+        </CardHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <div>
-              <label className="block text-sm font-medium text-neutral-400 mb-1">Nama Panggilan</label>
-              <input
-                type="text"
-                required={!isLogin}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 transition-colors"
-                placeholder="John Doe"
-              />
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-muted-foreground">
+                  Nama Panggilan
+                </Label>
+                <Input id="name" type="text" required={!isLogin} value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" className="bg-background h-12" />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-muted-foreground">
+                Email
+              </Label>
+              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="JhonDoe@example.com" className="bg-background h-12" />
             </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-medium text-neutral-400 mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 transition-colors"
-              placeholder="developer@example.com"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-muted-foreground">
+                Password
+              </Label>
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 6 karakter" className="bg-background h-12" />
+            </div>
+          </CardContent>
 
-          <div>
-            <label className="block text-sm font-medium text-neutral-400 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 transition-colors"
-              placeholder="Minimal 6 karakter"
-            />
-          </div>
+          <CardFooter className="flex flex-col gap-4 pt-4">
+            <Button type="submit" disabled={isLoading} className="w-full h-12 font-bold text-md tracking-wide shadow-lg shadow-primary/20">
+              {isLoading ? 'Memproses...' : isLogin ? 'Masuk' : 'Daftar Sekarang'}
+            </Button>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-3 rounded-lg font-bold transition-colors mt-4 ${
-              isLoading ? 'bg-neutral-600 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'
-            }`}
-          >
-            {isLoading ? 'Memproses...' : isLogin ? 'Masuk' : 'Daftar Sekarang'}
-          </button>
+            <div className="text-sm text-muted-foreground text-center mt-2">
+              {isLogin ? 'Belum punya akun? ' : 'Sudah punya akun? '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                }}
+                className="text-primary hover:text-primary/80 font-bold transition-colors underline-offset-4 hover:underline"
+              >
+                {isLogin ? 'Buat akun baru' : 'Masuk di sini'}
+              </button>
+            </div>
+          </CardFooter>
         </form>
-
-        <div className="mt-6 text-center text-sm text-neutral-400">
-          {isLogin ? "Belum punya akun? " : "Sudah punya akun? "}
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setErrorMsg('');
-            }}
-            className="text-red-400 hover:text-red-300 font-bold transition-colors"
-          >
-            {isLogin ? 'Daftar di sini' : 'Masuk di sini'}
-          </button>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }
