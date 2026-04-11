@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
-// RECHARTS COMPONENTS (Menambahkan Rectangle sesuai dokumentasi Shadcn)
+// RECHARTS COMPONENTS
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceLine, Rectangle } from 'recharts';
 
 // KONFIGURASI CHART
@@ -195,9 +195,6 @@ export default function AnalyticsPage() {
                             <ChartTooltipContent
                               hideLabel={false}
                               formatter={(value, name, item) => {
-                                // 💡 ALAT PENYADAP (DEBUGGING)
-                                // Buka Inspect Element -> tab "Console" di browser Anda
-                                // Perhatikan apa saja isi dari item.payload saat Anda me-hover grafik
                                 console.log('Isi Payload dari Backend:', item.payload);
 
                                 return (
