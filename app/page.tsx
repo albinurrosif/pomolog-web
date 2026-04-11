@@ -146,7 +146,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-neutral-900 text-white font-sans selection:bg-red-500 selection:text-white">
       <Header />
-      <main className="max-w-6xl mx-auto p-4 md:p-8 mt-4 md:mt-8">
+      <main className="w-full px-10 mx-auto p-4 md:p-8 mt-4 md:mt-8">
         {/* GRID: 1 Kolom di HP, 2 Kolom (Kiri-Kanan) di Layar Besar */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* KOLOM KIRI (TIMER) - Lebar 5/12 */}

@@ -26,12 +26,15 @@ export default function Header() {
           <Link href="/history" className={`font-bold transition-colors text-sm ${pathname === '/history' ? 'text-red-500' : 'text-neutral-500 hover:text-white'}`}>
             RIWAYAT
           </Link>
+          <Link href="/analytics" className={`font-bold transition-colors text-sm ${pathname === '/analytics' ? 'text-red-500' : 'text-neutral-500 hover:text-white'}`}>
+            ANALYTICS
+          </Link>
         </nav>
 
         {/* TOMBOL LOGOUT */}
         <button
           onClick={() => {
-            Cookies.remove('token');
+            Cookies.remove('token', { path: '/' });
             router.push('/login');
           }}
           className="text-xs font-bold text-neutral-400 hover:text-red-400 transition-colors"

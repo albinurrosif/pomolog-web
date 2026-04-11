@@ -19,6 +19,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
   const [isActive, setIsActive] = useState(false);
   const [taskTimeLog, setTaskTimeLog] = useState<Record<number, number>>({});
   const [showEarlyFinishModal, setShowEarlyFinishModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // PELINDUNG ANTI-REFRESH
   useEffect(() => {
@@ -99,12 +100,17 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
 
   // LOGIKA TOMBOL SELESAI (EARLY FINISH)
   const handleCompleteButtonClick = async () => {
+    // Cegah klik ganda saat proses sedang berjalan
+    if (isSubmitting) return;
+
     // Jika timer masih memiliki sisa waktu dan kita sedang mode Fokus
     if (timeLeft > 0 && timeLeft < FOCUS_DURATION && mode === 'FOCUS') {
       setShowEarlyFinishModal(true);
     } else {
-      // Jika waktu sudah habis, atau ini sedang mode break, selesaikan biasa
-      await onFinishTask();
+      // Proses selesai normal tanpa modal
+      setIsSubmitting(true);
+      try { await onFinishTask(); }
+      finally { setIsSubmitting(false); }
     }
   };
 

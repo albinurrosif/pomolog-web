@@ -160,7 +160,7 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
       {/* --- RIWAYAT SELESAI (DONE HARI INI SAJA) --- */}
       {doneTasks.length > 0 && (
         <div className="space-y-3 pt-4 border-t border-neutral-800">
-          <h3 className="text-sm font-bold text-green-500 uppercase tracking-wider mb-4">Selesai Hari Ini 🎉</h3>
+          <h3 className="text-sm font-bold text-green-500 uppercase tracking-wider mb-4">Dibuat Hari Ini 🎉</h3>
           {doneTasks.map((task) => (
             <div key={task.id} className="flex justify-between items-center p-4 rounded-lg border border-neutral-800 bg-neutral-900/30 opacity-60">
               <div className="flex flex-col">
