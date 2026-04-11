@@ -8,6 +8,7 @@ import { Task } from '@/app/page';
 export default function HistoryPage() {
   const [historyTasks, setHistoryTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -22,6 +23,7 @@ export default function HistoryPage() {
         setHistoryTasks(doneTasks);
       } catch (error) {
         console.error('Gagal mengambil riwayat:', error);
+        setErrorMessage('Gagal memuat riwayat. Silakan coba lagi nanti.');
       } finally {
         setIsLoading(false);
       }
@@ -32,7 +34,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-neutral-900 text-white font-sans selection:bg-red-500 selection:text-white">
       <Header />
-      <main className="max-w-2xl mx-auto p-6 mt-10 flex flex-col gap-8">
+      <main className="max-w-6xl mx-auto p-6 mt-10 flex flex-col gap-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold tracking-wider">Laci Arsip 🗄️</h1>
           <p className="text-neutral-400">Semua tugas yang telah berhasil Anda taklukkan.</p>
@@ -41,6 +43,8 @@ export default function HistoryPage() {
         <section className="w-full bg-neutral-800/50 p-6 rounded-2xl border border-neutral-800">
           {isLoading ? (
             <p className="text-neutral-500 text-center py-8 animate-pulse">Memuat riwayat Anda...</p>
+          ) : errorMessage ? (
+            <p className="text-red-500 text-center py-8">{errorMessage}</p>
           ) : historyTasks.length === 0 ? (
             <p className="text-neutral-500 text-center py-8 italic">Belum ada tugas yang diselesaikan. Ayo mulai fokus!</p>
           ) : (
@@ -52,14 +56,13 @@ export default function HistoryPage() {
                       <span className="font-bold text-lg text-white line-through opacity-80">{task.title}</span>
                       <span className="text-xs font-bold text-green-500 mt-1">✓ SELESAI</span>
                     </div>
-                    
                   </div>
 
                   <div className="flex flex-col gap-2 pt-3 border-t border-neutral-800">
                     <p className="text-neutral-400 text-sm">{task.description || <span className="italic">Tidak ada deskripsi.</span>}</p>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-xs text-neutral-500">
-                        Selesai pada:{' '}
+                        Dibuat pada:{' '}
                         {new Date(task.createdAt).toLocaleString('id-ID', {
                           day: 'numeric',
                           month: 'long',
