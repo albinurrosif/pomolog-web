@@ -5,14 +5,17 @@ import { Task } from '@/app/page';
 
 interface TimerProps {
   activeTask: Task | null;
-  onFinishTask: () => void;
+  onFinishTask: () => Promise<void>;
   onSessionComplete: (payload: { durationMinutes: number; tasks: { taskId: number; minutesSpent: number }[] }) => void;
-  onReviewTask: () => Promise<void> | void;
+  onReviewTask: () => Promise<void>;
 }
+
+const FOCUS_DURATION = 25 * 60; // 25 menit dalam detik
+const BREAK_DURATION = 5 * 60; // 5 menit dalam detik
 
 export default function Timer({ activeTask, onFinishTask, onSessionComplete, onReviewTask }: TimerProps) {
   const [mode, setMode] = useState<'FOCUS' | 'BREAK'>('FOCUS');
-  const [timeLeft, setTimeLeft] = useState(10);
+  const [timeLeft, setTimeLeft] = useState(FOCUS_DURATION);
   const [isActive, setIsActive] = useState(false);
   const [taskTimeLog, setTaskTimeLog] = useState<Record<number, number>>({});
   const [showEarlyFinishModal, setShowEarlyFinishModal] = useState(false);
@@ -58,7 +61,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
   }, [isActive, timeLeft, mode, activeTask]);
 
   // LOGIKA SELESAI SESI
-  const handleSessionEnd = () => {
+  const handleSessionEnd = async () => {
     setIsActive(false);
 
     if (mode === 'FOCUS') {
@@ -79,29 +82,29 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
       }
 
       if (activeTask && activeTask.title.startsWith('Review: ')) {
-        onFinishTask(); // finish review task
+        await onFinishTask(); // finish review task
         alert('Sesi selesai! Tugas Review otomatis ditandai selesai.');
       } else {
         alert('Sesi Fokus Selesai! Kamu dapat 25 menit di Analytics.');
       }
       setMode('BREAK');
-      setTimeLeft(300);
+      setTimeLeft(BREAK_DURATION);
       setTaskTimeLog({});
     } else {
       alert('Waktu Istirahat Habis! Siap kerja lagi?');
       setMode('FOCUS');
-      setTimeLeft(10);
+      setTimeLeft(FOCUS_DURATION);
     }
   };
 
   // LOGIKA TOMBOL SELESAI (EARLY FINISH)
-  const handleCompleteButtonClick = () => {
+  const handleCompleteButtonClick = async () => {
     // Jika timer masih memiliki sisa waktu dan kita sedang mode Fokus
-    if (timeLeft > 0 && timeLeft < 1500 && mode === 'FOCUS') {
+    if (timeLeft > 0 && timeLeft < FOCUS_DURATION && mode === 'FOCUS') {
       setShowEarlyFinishModal(true);
     } else {
       // Jika waktu sudah habis, atau ini sedang mode break, selesaikan biasa
-      onFinishTask();
+      await onFinishTask();
     }
   };
 
@@ -119,12 +122,12 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
     if (mode === 'BREAK') {
       setIsActive(false);
       setMode('FOCUS');
-      setTimeLeft(10);
+      setTimeLeft(FOCUS_DURATION);
     } else {
       if (window.confirm('Batalkan sesi ini? Waktu fokus tidak akan dicatat.')) {
         setIsActive(false);
         setMode('FOCUS');
-        setTimeLeft(10);
+        setTimeLeft(FOCUS_DURATION);
         setTaskTimeLog({});
       }
     }
@@ -159,7 +162,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
               </button>
             )}
           </div>
-        ) : timeLeft < 1500 ? (
+        ) : timeLeft < FOCUS_DURATION ? (
           <p className="text-yellow-500 text-sm font-medium animate-pulse">Sisa sesi masih ada! Pilih tugas baru di bawah untuk melanjutkan.</p>
         ) : (
           <p className="text-neutral-400 text-sm italic">Belum ada tugas aktif. Silakan pilih di bawah.</p>
@@ -176,7 +179,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
             onClick={handleStartPause}
             className={`px-8 py-3 rounded-full font-bold text-lg transition-all w-48 ${isActive ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : mode === 'FOCUS' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
           >
-            {isActive ? 'PAUSE' : mode === 'FOCUS' ? (timeLeft < 10 ? 'RESUME' : 'START FOKUS') : 'MULAI ISTIRAHAT'}
+            {isActive ? 'PAUSE' : mode === 'FOCUS' ? (timeLeft < FOCUS_DURATION ? 'RESUME' : 'START FOKUS') : 'MULAI ISTIRAHAT'}
           </button>
         )}
 
@@ -185,7 +188,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
             LEWATI
           </button>
         ) : (
-          timeLeft < 10 && (
+          timeLeft < FOCUS_DURATION && (
             <button onClick={handleResetOrSkip} className="bg-neutral-800 px-8 py-3 rounded-full font-bold text-lg hover:text-red-400 transition-colors">
               RESET
             </button>
@@ -202,8 +205,8 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
             </p>
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => {
-                  onFinishTask(); // Selesaikan tugas lama
+                onClick={async () => {
+                  await onFinishTask(); // Selesaikan tugas lama
                   setShowEarlyFinishModal(false); // Tutup modal
                   // Auto-pause akan menyala otomatis karena activeTask jadi null
                 }}
@@ -213,8 +216,8 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
               </button>
               {!activeTask.title.startsWith('Review: ') && (
                 <button
-                  onClick={() => {
-                    onReviewTask();
+                  onClick={async () => {
+                    await onReviewTask();
                     setShowEarlyFinishModal(false);
                   }}
                   className="bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-bold transition-colors text-sm shadow-lg shadow-red-500/20"
