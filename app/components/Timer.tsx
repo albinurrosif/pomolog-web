@@ -1,32 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Task } from '@/app/page';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+
+import { useTimer } from '@/app/context/TimerContext';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface TimerProps {
-  activeTask: Task | null;
-  onFinishTask: () => Promise<void>;
-  onSessionComplete: (payload: { durationMinutes: number; tasks: { taskId: number; minutesSpent: number }[] }) => void;
-  onReviewTask: () => Promise<void>;
+  onFinishTask: (taskId: number) => Promise<boolean>;
+  onSessionComplete: (payload: { durationMinutes: number; tasks: { taskId: number; minutesSpent: number }[] }) => Promise<boolean>;
+  onReviewTask: (taskId: number, taskTitle: string) => Promise<boolean>;
 }
 
-const FOCUS_DURATION = 25 * 60; // 25 menit dalam detik
-const BREAK_DURATION = 5 * 60; // 5 menit dalam detik
+const FOCUS_DURATION = 25 * 60;
+const BREAK_DURATION = 5 * 60;
 
-export default function Timer({ activeTask, onFinishTask, onSessionComplete, onReviewTask }: TimerProps) {
-  const [mode, setMode] = useState<'FOCUS' | 'BREAK'>('FOCUS');
-  const [timeLeft, setTimeLeft] = useState(FOCUS_DURATION);
-  const [isActive, setIsActive] = useState(false);
-  const [taskTimeLog, setTaskTimeLog] = useState<Record<number, number>>({});
+export default function Timer({ onFinishTask, onSessionComplete, onReviewTask }: TimerProps) {
+  // Ambil state dan fungsi dari TimerContext
+  const { timeLeft, isActive, mode, activeTaskData, taskTimeLog, toggleTimer, resetTimer, setMode, setTimeLeft, clearTaskTimeLog } = useTimer();
+
   const [showEarlyFinishModal, setShowEarlyFinishModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // PELINDUNG ANTI-REFRESH
+  // 1. PELINDUNG ANTI-REFRESH
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isActive && mode === 'FOCUS') {
@@ -38,80 +37,59 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isActive, mode]);
 
-  // TIMER UTAMA
+  // 2. DETEKSI TIMER HABIS (00:00) & LOGIKA SELESAI SESI
+  const prevTimeRef = useRef(timeLeft);
+
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    const handleSessionEnd = async () => {
+      if (mode === 'FOCUS') {
+        const tasksPayload = Object.entries(taskTimeLog).map(([idStr, minutes]) => ({
+          taskId: Number(idStr),
+          minutesSpent: Math.max(1, minutes),
+        }));
 
-    // AUTO-PAUSE
-    if (isActive && mode === 'FOCUS' && !activeTask) {
-      setIsActive(false);
-      toast.info('Task dilepas. Timer dijeda otomatis. Pilih task lain untuk melanjutkan.');
-      return;
-    }
+        if (tasksPayload.length > 0) {
+          const isRecorded = await onSessionComplete({
+            durationMinutes: 25,
+            tasks: tasksPayload,
+          });
 
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((t) => t - 1);
-
-        if (activeTask && mode === 'FOCUS') {
-          setTaskTimeLog((prev) => ({
-            ...prev,
-            [activeTask.id]: (prev[activeTask.id] || 0) + 1,
-          }));
+          if (!isRecorded) return;
         }
-      }, 1000);
-    } else if (isActive && timeLeft === 0) {
+
+        if (activeTaskData && activeTaskData.title.startsWith('Review: ')) {
+          await onFinishTask(activeTaskData.id);
+          toast.success('Sesi selesai. Task Review otomatis ditandai Done.');
+        } else {
+          toast.success('Sesi Fokus Selesai. 25 menit ditambahkan ke Analytics.');
+        }
+
+        setMode('SHORT_BREAK');
+        setTimeLeft(BREAK_DURATION);
+        clearTaskTimeLog();
+      } else {
+        toast.info('Waktu istirahat habis. Siap untuk sprint berikutnya?');
+        setMode('FOCUS');
+        setTimeLeft(FOCUS_DURATION);
+      }
+    };
+
+    if (prevTimeRef.current > 0 && timeLeft === 0 && !isActive) {
       handleSessionEnd();
     }
-    return () => clearInterval(interval);
-  }, [isActive, timeLeft, mode, activeTask]);
+    prevTimeRef.current = timeLeft;
+  }, [timeLeft, isActive, mode, taskTimeLog, activeTaskData, onFinishTask, onSessionComplete, setMode, setTimeLeft, clearTaskTimeLog]);
 
-  // LOGIKA SELESAI SESI
-  const handleSessionEnd = async () => {
-    setIsActive(false);
-
-    if (mode === 'FOCUS') {
-      const tasksPayload = Object.entries(taskTimeLog).map(([idStr, seconds]) => ({
-        taskId: Number(idStr),
-        minutesSpent: Math.max(1, Math.round(seconds / 60)),
-      }));
-
-      if (tasksPayload.length > 0) {
-        onSessionComplete({
-          durationMinutes: 25,
-          tasks: tasksPayload,
-        });
-      } else {
-        console.error('Gagal mengirim sesi: Tidak ada waktu yang tercatat.');
-      }
-
-      if (activeTask && activeTask.title.startsWith('Review: ')) {
-        await onFinishTask();
-        toast.success('Sesi selesai. Task Review otomatis ditandai Done.');
-      } else {
-        toast.success('Sesi Fokus Selesai. 25 menit ditambahkan ke Analytics.');
-      }
-
-      setMode('BREAK');
-      setTimeLeft(BREAK_DURATION);
-      setTaskTimeLog({});
-    } else {
-      toast.info('Waktu istirahat habis. Siap untuk sprint berikutnya?');
-      setMode('FOCUS');
-      setTimeLeft(FOCUS_DURATION);
-    }
-  };
-
-  // LOGIKA TOMBOL SELESAI (EARLY FINISH)
+  // LOGIKA TOMBOL SELESAI AWAL (EARLY FINISH)
   const handleCompleteButtonClick = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || !activeTaskData) return;
 
     if (timeLeft > 0 && timeLeft < FOCUS_DURATION && mode === 'FOCUS') {
       setShowEarlyFinishModal(true);
     } else {
       setIsSubmitting(true);
       try {
-        await onFinishTask();
+        await onFinishTask(activeTaskData.id);
       } finally {
         setIsSubmitting(false);
       }
@@ -120,25 +98,23 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
 
   // LOGIKA TOMBOL START/PAUSE
   const handleStartPause = () => {
-    if (mode === 'FOCUS' && !activeTask && !isActive) {
-      toast.info('Pilih task dari Backlog terlebih dahulu.');
+    if (mode === 'FOCUS' && !activeTaskData && !isActive) {
+      toast.info('Pilih task dari Antrean terlebih dahulu.');
       return;
     }
-    setIsActive(!isActive);
+    toggleTimer();
   };
 
   // LOGIKA TOMBOL RESET/SKIP
   const handleResetOrSkip = () => {
-    if (mode === 'BREAK') {
-      setIsActive(false);
+    if (mode === 'SHORT_BREAK') {
       setMode('FOCUS');
       setTimeLeft(FOCUS_DURATION);
+      if (isActive) toggleTimer();
     } else {
       if (window.confirm('Batalkan sesi ini? Waktu fokus tidak akan dicatat ke Analytics.')) {
-        setIsActive(false);
-        setMode('FOCUS');
-        setTimeLeft(FOCUS_DURATION);
-        setTaskTimeLog({});
+        resetTimer();
+        clearTaskTimeLog();
       }
     }
   };
@@ -161,37 +137,34 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
 
   return (
     <section className="flex flex-col items-center gap-8 w-full pt-0 mt-0">
-      {/* LABEL MODE */}
       <div className="flex flex-col items-center gap-2">
         <h2 className={`text-sm font-bold tracking-[0.2em] uppercase ${mode === 'FOCUS' ? 'text-primary' : 'text-green-500'}`}>{mode === 'FOCUS' ? 'FOCUS SESSION' : 'SHORT BREAK'}</h2>
       </div>
 
-      {/* LINGKARAN TIMER (Diperbesar & Ditebalkan) */}
       <div
         className={`
-    relative flex items-center justify-center
-    w-[22rem] h-[22rem] rounded-full
-    border-[16px] shadow-2xl
-    transition-all duration-700
-    ${mode === 'FOCUS' ? 'border-primary shadow-primary/30 bg-background' : 'border-green-500 shadow-green-500/30 bg-background'}
-  `}
+          relative flex items-center justify-center
+          w-[22rem] h-[22rem] rounded-full
+          border-[16px] shadow-2xl
+          transition-all duration-700
+          ${mode === 'FOCUS' ? 'border-primary shadow-primary/30 bg-background' : 'border-green-500 shadow-green-500/30 bg-background'}
+        `}
       >
         <span className="text-8xl font-mono font-black tracking-tighter text-foreground">{formatTime(timeLeft)}</span>
       </div>
 
-      {/* AREA TASK AKTIF */}
       <Card className="w-full max-w-sm bg-card/50 border-border">
         <CardContent className="p-6 flex flex-col items-center justify-center min-h-[120px] text-center gap-3">
-          {mode === 'BREAK' ? (
+          {mode === 'SHORT_BREAK' ? (
             <p className="text-muted-foreground text-sm font-medium">Jauhkan mata dari layar dan regangkan badan.</p>
-          ) : activeTask ? (
+          ) : activeTaskData ? (
             <>
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Task</span>
-                <span className="font-bold text-xl text-foreground leading-tight">{activeTask.title}</span>
+                <span className="font-bold text-xl text-foreground leading-tight">{activeTaskData.title}</span>
               </div>
 
-              {(isActive || (taskTimeLog[activeTask.id] || 0) > 0) && (
+              {(isActive || (taskTimeLog[activeTaskData.id] || 0) > 0) && (
                 <Button onClick={handleCompleteButtonClick} disabled={isSubmitting} variant="outline" size="sm" className="mt-2 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-white transition-all font-bold">
                   Tandai Selesai
                 </Button>
@@ -205,9 +178,8 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
         </CardContent>
       </Card>
 
-      {/* TOMBOL KONTROL UTAMA */}
       <div className="flex gap-4 w-full max-w-sm">
-        {mode === 'BREAK' && isActive ? (
+        {mode === 'SHORT_BREAK' && isActive ? (
           <Button disabled className="flex-1 h-14 text-lg font-bold uppercase tracking-wider">
             BERJALAN...
           </Button>
@@ -220,7 +192,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
           </Button>
         )}
 
-        {mode === 'BREAK' ? (
+        {mode === 'SHORT_BREAK' ? (
           <Button variant="secondary" onClick={handleResetOrSkip} className="h-14 px-8 font-bold text-muted-foreground hover:text-foreground">
             SKIP
           </Button>
@@ -233,7 +205,6 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
         )}
       </div>
 
-      {/* SHADCN DIALOG: EARLY FINISH */}
       <Dialog open={showEarlyFinishModal} onOpenChange={(open) => !open && setShowEarlyFinishModal(false)}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
@@ -249,7 +220,7 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
               disabled={isSubmitting}
               onClick={() =>
                 runWithSubmitLock(async () => {
-                  await onFinishTask();
+                  if (activeTaskData) await onFinishTask(activeTaskData.id);
                   setShowEarlyFinishModal(false);
                 })
               }
@@ -258,12 +229,12 @@ export default function Timer({ activeTask, onFinishTask, onSessionComplete, onR
               Pilih Task Lain Manual
             </Button>
 
-            {!activeTask?.title.startsWith('Review: ') && (
+            {!activeTaskData?.title.startsWith('Review: ') && (
               <Button
                 disabled={isSubmitting}
                 onClick={() =>
                   runWithSubmitLock(async () => {
-                    await onReviewTask();
+                    if (activeTaskData) await onReviewTask(activeTaskData.id, activeTaskData.title);
                     setShowEarlyFinishModal(false);
                   })
                 }
