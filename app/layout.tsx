@@ -3,6 +3,7 @@ import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
+import { TimerProvider } from './context/TimerContext';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
@@ -22,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="id" className={cn('dark h-full antialiased', jetbrainsMono.className)}>
       <body className="min-h-full flex flex-col">
-        {children}
+        <TimerProvider>
+          {children}
+        </TimerProvider>
         <Toaster position="top-center" theme="dark" richColors closeButton />
       </body>
     </html>

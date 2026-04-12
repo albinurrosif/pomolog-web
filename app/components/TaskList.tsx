@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Task } from '@/app/page';
+import { Task } from '@/app/(dashboard)/dashboard/page';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -62,14 +62,14 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
   const todoTasks = tasks.filter((t) => t.status === 'Todo');
   const doneTasks = tasks.filter((t) => t.status === 'Done' && isToday(t.createdAt));
 
-  // Fungsi Pembantu: Render Ikon Tomat (1 Tomat = 25 Menit)
+  // Fungsi Pembantu: Render Tomat berdasarkan menit yang dihabiskan
   const renderTomatoes = (minutes: number) => {
-    if (minutes < 1) return null; // Belum mencapai 1 sesi penuh
-    const tomatoCount = Math.floor(minutes / 1);
+    if (minutes < 25) return null; // Harus 25
+    const tomatoCount = Math.floor(minutes / 25); // Harus dibagi 25
     return (
-      <span className="ml-2 text-sm" title={`${tomatoCount} Sesi Selesai`}>
+      <span className="ml-2 text-sm tracking-widest" title={`${tomatoCount} Sesi Selesai`}>
         {Array.from({ length: tomatoCount })
-          .map((_, i) => '🍅')
+          .map(() => '🍅')
           .join('')}
       </span>
     );
@@ -86,7 +86,7 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
             className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-2 text-base font-medium placeholder:text-muted-foreground"
             placeholder="Ketik judul task di sini..."
           />
-          <div className="h-[1px] w-full bg-border" /> {/* Garis pemisah estetik */}
+          <div className="h-[1px] w-full bg-border" />
           <Textarea
             value={descValue}
             onChange={(e) => setDescValue(e.target.value)}
@@ -181,6 +181,10 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (task.id === activeTaskId) {
+                                toast.error('Selesaikan atau lepas task dari timer sebelum menghapusnya!');
+                                return;
+                              }
                               if (task.totalMinutesSpent > 0) {
                                 toast.info('Task ini sudah dikerjakan. Daripada dihapus, mending diselesaikan agar masuk Analytics!');
                                 return;
@@ -202,10 +206,9 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
         </div>
 
         {/* --- RIWAYAT SELESAI (DONE HARI INI SAJA) --- */}
-        {/* --- RIWAYAT SELESAI (DONE HARI INI SAJA) --- */}
         {doneTasks.length > 0 && (
           <div className="space-y-3 pt-6 border-t border-border">
-            <h3 className="text-sm font-bold text-green-500 uppercase tracking-wider mb-4">Selesai Hari Ini 🎉</h3>
+            <h3 className="text-sm font-bold text-green-500 uppercase tracking-wider mb-4">Selesai Hari Ini</h3>
             {doneTasks.map((task) => {
               const isExpanded = expandedTaskId === task.id;
 

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Header from '../components/Header';
-import api from '../lib/api';
-import { Task } from '@/app/page';
+import Header from '../../components/Header';
+import api from '../../lib/api';
+import { Task } from '@/app/(dashboard)/dashboard/page';
 
 // SHADCN COMPONENTS
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -33,16 +33,21 @@ export default function AnalyticsPage() {
 
   // --- API FETCHING ---
   useEffect(() => {
+    // Variabel untuk mencegah update state jika komponen sudah unmounted
+    let cancelled = false;
+
     const fetchAnalytics = async () => {
       setIsLoading(true);
       setErrorMessage(null);
       try {
         const [tasksRes, summaryRes, chartRes] = await Promise.all([api.get('/Tasks/with-time-spent'), api.get('/Analytics/summary'), api.get(`/Analytics/${timeRange}`)]);
 
+        if (cancelled) return;
+
         setTasks(tasksRes.data);
         setSummary(summaryRes.data);
 
-        // Hanya di-reverse, TANPA manipulasi fill color manual
+        // Data dari backend sudah diurutkan dari yang paling lama ke terbaru, balik agar yang terbaru di kanan
         const sortedData = [...chartRes.data].reverse();
         setChartData(sortedData);
       } catch (error) {
@@ -53,6 +58,11 @@ export default function AnalyticsPage() {
       }
     };
     fetchAnalytics();
+
+    // Cleanup function untuk mencegah state update jika komponen sudah unmounted
+    return () => {
+      cancelled = true;
+    };
   }, [timeRange]);
 
   // --- DATA CALCULATIONS ---
