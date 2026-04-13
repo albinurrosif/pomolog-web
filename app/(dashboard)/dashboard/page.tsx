@@ -12,18 +12,18 @@ export type Task = { id: number; title: string; description: string; createdAt: 
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
 
-  const activeTask = tasks.find((t) => t.id === activeTaskId) || null;
+  // 1. SEDOT STATE DARI CONTEXT SEBAGAI SUMBER KEBENARAN TUNGGAL (Single Source of Truth)
+  const { activeTaskData, setActiveTaskData, shouldRefreshTasks } = useTimer();
 
-  const { activeTaskData, setActiveTaskData } = useTimer();
+  // 2. DERIVASI ID TASK AKTIF (Menggantikan useState yang lama agar tidak out-of-sync)
+  const activeTaskId = activeTaskData?.id ?? null;
 
-  // Ambil data tugas dari Backend saat halaman dimuat
+  // Ambil data tugas dari Backend saat halaman dimuat atau saat timer memberi sinyal refresh
   useEffect(() => {
     const fetchTasks = async () => {
       try {
         const response = await api.get('/Tasks/with-time-spent');
-        console.log('Tugas berhasil diambil:', response.data);
         setTasks(response.data);
       } catch (error) {
         console.error('Gagal mengambil tugas:', error);
@@ -31,24 +31,23 @@ export default function Home() {
       }
     };
     fetchTasks();
-  }, []);
+  }, [shouldRefreshTasks]);
 
   // Tambah Tugas Baru ke Backend
   const handleAddTask = async (title: string, description: string): Promise<boolean> => {
     try {
       const response = await api.post('/Tasks', { title, description });
-      // Menggunakan fungsional updater (prev) untuk menghindari Race Condition
       setTasks((prev) => [...prev, response.data]);
       toast.success('Tugas baru berhasil masuk antrean! 🚀');
       return true;
     } catch (error) {
       console.error('Gagal menambah tugas:', error);
       toast.error('Gagal menambah tugas. Pastikan sesi login kamu masih aktif ya.');
-      return false; // Beritahu TaskList bahwa proses gagal
+      return false;
     }
   };
 
-  // Pilih Tugas (Hanya state UI, tidak menembak API)
+  // Pilih Tugas
   const handleSelectTask = (id: number | null) => {
     if (id === null) {
       setActiveTaskData(null);
@@ -83,26 +82,20 @@ export default function Home() {
     let didFinishCurrentTask = false;
 
     try {
-      // 1. fetch API Selesai
       await api.patch(`/Tasks/${taskId}/finish`);
       didFinishCurrentTask = true;
 
-      // 2. Tembak API create Tugas Review
       const response = await api.post('/Tasks', {
         title: `Review: ${taskTitle}`,
         description: 'Tugas review otomatis dari sisa waktu sesi.',
       });
       const newReviewTask = response.data;
 
-      // 3. Update State Tugas SECARA BERSAMAAN (Functional Updater)
       setTasks((prev) => {
-        // Ubah yang lama jadi Done
         const updatedTasks = prev.map((t) => (t.id === taskId ? { ...t, status: 'Done' } : t));
-        // Masukkan yang baru ke array
         return [...updatedTasks, newReviewTask];
       });
 
-      // 4. Langsung aktifkan tugas baru ke Context
       setActiveTaskData({ id: newReviewTask.id, title: newReviewTask.title });
       toast.success('Beralih ke mode Review. Ayo cek ulang pekerjaanmu! 🧐');
       return true;
@@ -110,7 +103,6 @@ export default function Home() {
       console.error('Gagal melakukan proses review otomatis:', error);
 
       if (didFinishCurrentTask) {
-        // Jika tugas lama sudah terlanjur selesai di Backend, bersihkan UI
         setActiveTaskData(null);
         try {
           const response = await api.get('/Tasks/with-time-spent');
@@ -124,32 +116,15 @@ export default function Home() {
     }
   };
 
-  // Mencatat Sesi Pomodoro ke Backend
-  const handleSessionComplete = async (payload: { durationMinutes: number; tasks: { taskId: number; minutesSpent: number }[] }): Promise<boolean> => {
-    try {
-      await api.post('/Sessions', payload);
-      console.log('Sesi Pomodoro sukses dicatat di Database!');
-
-      const response = await api.get('/Tasks/with-time-spent');
-      setTasks(response.data);
-      return true;
-    } catch (error) {
-      console.error('Gagal mencatat sesi:', error);
-      toast.error('Gagal mencatat waktu fokusmu ke database.');
-      return false;
-    }
-  };
-
   // Hapus Tugas
   const handleDeleteTask = async (id: number) => {
     try {
       await api.delete(`/Tasks/${id}`);
 
-      // Hapus dari state UI
       setTasks((prev) => prev.filter((t) => t.id !== id));
 
-      // Jika tugas yang dihapus sedang aktif, lepaskan dari timer
-      if (activeTaskId === id) setActiveTaskId(null);
+      // Jika tugas yang dihapus sedang aktif, lepaskan dari Context timer
+      if (activeTaskId === id) setActiveTaskData(null);
 
       toast.success('Tugas berhasil dihapus dari antrean.');
     } catch (error) {
@@ -159,20 +134,15 @@ export default function Home() {
   };
 
   return (
-    // RESPONSIVE PARENT: Di HP min-h-screen (bisa scroll), di Laptop h-screen dan overflow-hidden
-    <div className="min-h-screen lg:h-screen flex flex-col bg-background text-foreground font-sans selection:bg-primary selection:text-primary-foreground lg:overflow-hidden">
+    <div className="min-h-screen lg:h-screen flex flex-col text-foreground font-sans selection:bg-primary selection:text-primary-foreground lg:overflow-hidden">
       <Header />
 
-      {/* overflow-hidden hanya aktif di Laptop */}
-      <main className="flex-1 w-full max-w-[1400px] mx-auto p-4 md:p-8 lg:overflow-hidden flex flex-col">
-        {/* GRID: 1 Kolom di HP, 2 Kolom di Laptop */}
+      <main className="flex-1 w-full max-w-350 mx-auto p-4 md:p-8 lg:overflow-hidden flex flex-col">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full flex-1">
-          {/* KOLOM KIRI (TIMER): Di HP mengikuti alur biasa, di Laptop mengambil tinggi penuh */}
           <div className="lg:col-span-5 lg:h-full flex flex-col justify-start">
-            <Timer onFinishTask={handleFinishTask} onSessionComplete={handleSessionComplete} onReviewTask={handleFinishAndReview} />
+            <Timer onFinishTask={handleFinishTask} onReviewTask={handleFinishAndReview} />
           </div>
 
-          {/* KOLOM KANAN (TASK LIST): Di HP memanjang ke bawah biasa, di Laptop menjadi Internal Scroll */}
           <div className="lg:col-span-7 lg:h-full lg:overflow-y-auto custom-scrollbar pb-10 pr-2">
             <TaskList tasks={tasks} activeTaskId={activeTaskId} onAddTask={handleAddTask} onSelectTask={handleSelectTask} onDeleteTask={handleDeleteTask} />
           </div>

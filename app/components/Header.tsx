@@ -21,8 +21,7 @@ export default function Header() {
   `;
 
   return (
-    // Efek Glassmorphism: bg-neutral-950/80 dan backdrop-blur-md
-    <header className="w-full bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800/50 sticky top-0 z-50">
+    <header className="w-full backdrop-blur-md border-b border-neutral-800/50 sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* LOGO & BRAND */}
         <Link href="/" className="flex items-center gap-2 group">
@@ -32,7 +31,7 @@ export default function Header() {
 
         {/* NAVIGASI UTAMA */}
         <nav className="hidden md:flex items-center gap-8">
-          <Link href="/dashboard" className={navLinkStyle('/')}>
+          <Link href="/dashboard" className={navLinkStyle('/dashboard')}>
             Workspace
             {pathname === '/dashboard' && <span className="absolute -bottom-5 left-0 w-full h-[2px] bg-primary rounded-t-md" />}
           </Link>

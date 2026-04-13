@@ -151,3 +151,52 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted);
 }
+
+/* Animasi untuk Glow Kiri Atas (Menyebar ke kanan dan ke bawah) */
+@keyframes blob-top {
+  0% {
+    transform: translate(0vw, 0vh) scale(1);
+    opacity: 0.2;
+  }
+  33% {
+    transform: translate(40vw, 20vh) scale(1.2);
+    opacity: 0.3;
+  }
+  66% {
+    transform: translate(20vw, 50vh) scale(0.8);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translate(0vw, 0vh) scale(1);
+    opacity: 0.2;
+  }
+}
+
+/* Animasi untuk Glow Kanan Bawah (Menyebar ke kiri dan ke atas) */
+@keyframes blob-bottom {
+  0% {
+    transform: translate(0vw, 0vh) scale(1);
+    opacity: 0.2;
+  }
+  33% {
+    transform: translate(-40vw, -30vh) scale(1.2);
+    opacity: 0.3;
+  }
+  66% {
+    transform: translate(-10vw, -60vh) scale(0.9);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translate(0vw, 0vh) scale(1);
+    opacity: 0.2;
+  }
+}
+
+/* Durasi diperlama (25 & 28 detik) agar terasa santai dan tidak membuat pusing */
+.animate-blob-top {
+  animation: blob-top 25s infinite alternate ease-in-out;
+}
+
+.animate-blob-bottom {
+  animation: blob-bottom 28s infinite alternate ease-in-out;
+}
