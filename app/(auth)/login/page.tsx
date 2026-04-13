@@ -35,7 +35,7 @@ export default function LoginPage() {
         if (token) {
           Cookies.set('token', token, { expires: 7 });
           toast.success('Login berhasil! Selamat datang kembali. 🚀');
-          router.push('/');
+          router.push('/dashboard');
         } else {
           toast.error('Token tidak ditemukan dari server.');
         }
@@ -59,7 +59,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4 font-sans selection:bg-primary selection:text-primary-foreground">
       {/* Efek Glow di belakang Card (Opsional, memberikan kesan premium) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/20 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/70 blur-[120px] rounded-full pointer-events-none" />
 
       <Card className="w-full max-w-md bg-card/50 backdrop-blur-xl border-border shadow-2xl relative z-10">
         <CardHeader className="text-center space-y-2 pb-6">
@@ -67,7 +67,7 @@ export default function LoginPage() {
             <span className="text-5xl drop-shadow-lg">🍅</span>
           </div>
           <CardTitle className="text-2xl font-bold tracking-widest uppercase">POMOLOG</CardTitle>
-          <CardDescription className="text-sm font-medium">{isLogin ? 'Selamat datang kembali, mari mulai fokus.' : 'Mulai perjalanan produktivitasmu hari ini.'}</CardDescription>
+          <CardDescription className="text-sm font-medium">{isLogin ? 'Selamat datang, mari mulai fokus.' : 'Mulai perjalanan produktivitasmu hari ini.'}</CardDescription>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>

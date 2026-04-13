@@ -111,7 +111,7 @@ export default function AnalyticsPage() {
   const todayKey = chartData.length > 0 ? chartData[chartData.length - 1][timeRange === 'weekly' ? 'dayName' : 'date'] : undefined;
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-primary-foreground">
+    <div className="min-h-screen text-foreground font-sans selection:bg-primary selection:text-primary-foreground">
       <Header />
       <main className="max-w-6xl mx-auto p-4 md:p-8 mt-4 md:mt-8 flex flex-col gap-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">

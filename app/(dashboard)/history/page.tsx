@@ -35,8 +35,8 @@ export default function HistoryPage() {
 
   // Fungsi Pembantu: Render Ikon Tomat (1 Tomat = 25 Menit)
   const renderTomatoes = (minutes: number) => {
-    if (minutes < 1) return null;
-    const tomatoCount = Math.floor(minutes / 1);
+    if (minutes < 25) return null;
+    const tomatoCount = Math.floor(minutes / 25);
     return (
       <span className="mr-2 text-sm tracking-widest" title={`${tomatoCount} Sesi Selesai`}>
         {Array.from({ length: tomatoCount })
@@ -48,7 +48,7 @@ export default function HistoryPage() {
 
   return (
     // Menggunakan variabel warna Shadcn
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-primary-foreground">
+    <div className="min-h-screen text-foreground font-sans selection:bg-primary selection:text-primary-foreground">
       <Header />
       <main className="max-w-5xl mx-auto p-4 md:p-8 mt-4 md:mt-8 flex flex-col gap-8">
         {/* HEADER SECTION */}

@@ -35,6 +35,10 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
   const handleAdd = async () => {
     const title = titleValue.trim();
     const description = descValue.trim();
+    if (titleValue.trim() === '') {
+      toast.error('Judul task tidak boleh kosong!');
+      return;
+    }
     if (!title) return;
 
     const isSuccess = await onAddTask(title, description);
@@ -84,7 +88,7 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
             value={titleValue}
             onChange={(e) => setTitleValue(e.target.value)}
             className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-2 text-base font-medium placeholder:text-muted-foreground"
-            placeholder="Ketik judul task di sini..."
+            placeholder="Ketik judul task di sini..." required
           />
           <div className="h-[1px] w-full bg-border" />
           <Textarea
@@ -120,7 +124,7 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
                     onClick={() => {
                       if (activeTaskId === task.id) onSelectTask(null);
                       else if (activeTaskId === null) onSelectTask(task.id);
-                      else toast.info('Batalkan task yang sedang berjalan dulu ya!');
+                      else toast.info('Lepas task yang sedang berjalan dulu ya!');
                     }}
                     onKeyDown={(e) => {
                       if (e.target !== e.currentTarget) return;
@@ -128,7 +132,7 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
                         e.preventDefault();
                         if (activeTaskId === task.id) onSelectTask(null);
                         else if (activeTaskId === null) onSelectTask(task.id);
-                        else toast.info('Batalkan task yang sedang berjalan dulu ya!');
+                        else toast.info('Lepas task yang sedang berjalan dulu ya!');
                       }
                     }}
                     className={`
