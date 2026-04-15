@@ -1,13 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import api from '../lib/api';
 
 export const DURATION = {
-  FOCUS: 50, // KEMBALIKAN KE 25 MENIT JIKA SUDAH SELESAI TESTING
-  SHORT_BREAK: 50,
-  LONG_BREAK: 100,
+  FOCUS: 25 * 60,
+  SHORT_BREAK: 5 * 60,
+  LONG_BREAK: 15 * 60,
 };
 
 interface TaskData {
@@ -24,11 +24,11 @@ interface TimerContextType {
   volume: number;
   isMuted: boolean;
   isPlayingMusic: boolean;
-  shouldRefreshTasks: number; 
+  shouldRefreshTasks: number;
 
   toggleTimer: () => void;
   resetTimer: () => void;
-  skipBreak: () => void; 
+  skipBreak: () => void;
   setMode: (mode: 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK') => void;
   setActiveTaskData: (task: TaskData | null) => void;
   setTimeLeft: (time: number) => void;
@@ -44,22 +44,21 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [timeLeft, setTimeLeft] = useState(DURATION.FOCUS);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK'>('FOCUS');
-  const [focusCycleCount, setFocusCycleCount] = useState<number>(0);
   const [activeTaskData, setActiveTaskData] = useState<TaskData | null>(null);
   const [taskTimeLog, setTaskTimeLog] = useState<Record<number, number>>({});
-
-  // State Sinyal untuk me-refresh data task di halaman utama
   const [shouldRefreshTasks, setShouldRefreshTasks] = useState(0);
+  const [focusCycleCount, setFocusCycleCount] = useState<number>(0);
 
   const [volume, setVolume] = useState<number>(0.5);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isPlayingMusic, setIsPlayingMusic] = useState<boolean>(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const prevTimeLeftRef = useRef<number>(DURATION.FOCUS); // ✅ Untuk hitung waktu dinamis
   const bellAudioRef = useRef<HTMLAudioElement | null>(null);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // 1. INISIALISASI AUDIO
+  // INISIALISASI AUDIO
   useEffect(() => {
     bellAudioRef.current = new Audio('/audio/universfield-school-bell-199584.mp3');
     musicAudioRef.current = new Audio('/audio/Different Heaven - Safe & Sound [NCS Release].mp3');
@@ -68,18 +67,20 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     musicAudioRef.current.addEventListener('ended', handleMusicEnded);
 
     return () => {
+      bellAudioRef.current?.pause();
+      musicAudioRef.current?.pause();
       musicAudioRef.current?.removeEventListener('ended', handleMusicEnded);
     };
   }, []);
 
-  // 2. SYNC VOLUME
+  // LOGIC UNTUK MENGATUR VOLUME AUDIO SESUAI PENGATURAN USER
   useEffect(() => {
     const actualVolume = isMuted ? 0 : volume;
     if (bellAudioRef.current) bellAudioRef.current.volume = actualVolume;
     if (musicAudioRef.current) musicAudioRef.current.volume = actualVolume;
   }, [volume, isMuted]);
 
-  // 3. PELINDUNG ANTI-REFRESH (Dipindah dari Timer.tsx)
+  // LOGIC UNTUK MENCEGAH USER MENUTUP TAB SAAT SPRINT AKTIF
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isActive && mode === 'FOCUS') {
@@ -91,7 +92,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isActive, mode]);
 
-  // 4. AUTO-PAUSE JIKA TASK DILEPAS (Sesuai fungsi lama)
+  // LOGIC OTOMATIS JEDA TIMER JIKA TASK AKTIF DILEPAS
   useEffect(() => {
     if (isActive && mode === 'FOCUS' && !activeTaskData) {
       setIsActive(false);
@@ -99,16 +100,17 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isActive, mode, activeTaskData]);
 
-  const stopMusic = () => {
+  // LOGIC UNTUK MENGHENTIKAN MUSIK PERAYAAN
+  const stopMusic = useCallback(() => {
     if (musicAudioRef.current) {
       musicAudioRef.current.pause();
       musicAudioRef.current.currentTime = 0;
     }
     setIsPlayingMusic(false);
-  };
+  }, []);
 
-  // 5. PENANGANAN WAKTU HABIS (Otomatis & Latar Belakang)
-  const handleTimeUp = async () => {
+  // LOGIC UTAMA SAAT TIMER HABIS
+  const handleTimeUp = useCallback(async () => {
     if (mode === 'FOCUS') {
       if (musicAudioRef.current) {
         musicAudioRef.current.currentTime = 0;
@@ -123,13 +125,12 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       if (tasksPayload.length > 0) {
         try {
-          await api.post('/Sessions', { durationMinutes: 25, tasks: tasksPayload });
+          await api.post('/Sessions', { durationMinutes: Math.floor(DURATION.FOCUS / 60), tasks: tasksPayload });
         } catch (error) {
           toast.error('Gagal mencatat riwayat fokus ke server.');
         }
       }
 
-      // AUTO FINISH UNTUK TASK REVIEW
       if (activeTaskData?.title.startsWith('Review: ')) {
         try {
           await api.patch(`/Tasks/${activeTaskData.id}/finish`);
@@ -144,17 +145,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       setShouldRefreshTasks((prev) => prev + 1);
 
-      // --- LOGIKA PENENTUAN LONG BREAK ---
       const newCycleCount = focusCycleCount + 1;
       setFocusCycleCount(newCycleCount);
 
       if (newCycleCount % 4 === 0) {
-        // Jika ini kelipatan 4, beri hadiah istirahat panjang
         setMode('LONG_BREAK');
         setTimeLeft(DURATION.LONG_BREAK);
         toast.info('Hebat! 4 Sesi Fokus selesai. Nikmati istirahat panjang Anda. 🎉');
       } else {
-        // Jika bukan kelipatan 4, istirahat pendek biasa
         setMode('SHORT_BREAK');
         setTimeLeft(DURATION.SHORT_BREAK);
       }
@@ -165,7 +163,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         new Notification('Sprint Selesai! 🍅', { body: 'Kerja bagus! Musik perayaan dimulai.', icon: '/favicon.ico' });
       }
     } else {
-      // JIKA ISTIRAHAT (Pendek/Panjang) HABIS
       stopMusic();
       if (bellAudioRef.current) {
         bellAudioRef.current.currentTime = 0;
@@ -180,8 +177,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         new Notification('Waktu Istirahat Habis! ☕', { body: 'Ayo kembali fokus!', icon: '/favicon.ico' });
       }
     }
-  };
+  }, [mode, activeTaskData, taskTimeLog, focusCycleCount, stopMusic]);
 
+  // LOGIC TIMER UTAMA
   useEffect(() => {
     if (isActive && timeLeft > 0) {
       intervalRef.current = setInterval(() => {
@@ -190,22 +188,26 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     } else if (timeLeft === 0 && isActive) {
       setIsActive(false);
       if (intervalRef.current) clearInterval(intervalRef.current);
-      handleTimeUp();
+      handleTimeUp().catch((err) => console.error('Error in handleTimeUp:', err));
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, timeLeft]);
+  }, [isActive, timeLeft, handleTimeUp]);
 
+  // MENGHITUNG WAKTU DINAMIS (Task Time Log) BERDASARKAN PERUBAHAN timeLeft
   useEffect(() => {
     if (isActive && mode === 'FOCUS' && activeTaskData) {
-      if (timeLeft % 60 === 0 && timeLeft !== DURATION.FOCUS) {
+      const prevMinutes = Math.floor(prevTimeLeftRef.current / 60);
+      const currentMinutes = Math.floor(timeLeft / 60);
+
+      if (prevMinutes !== currentMinutes && prevTimeLeftRef.current !== DURATION.FOCUS) {
         setTaskTimeLog((prev) => ({
           ...prev,
           [activeTaskData.id]: (prev[activeTaskData.id] || 0) + 1,
         }));
       }
+      prevTimeLeftRef.current = timeLeft;
     }
   }, [timeLeft, isActive, mode, activeTaskData]);
 
@@ -224,12 +226,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     else setTimeLeft(DURATION.LONG_BREAK);
   };
 
-  // FUNGSI SKIP BREAK AMAN (Solusi Bug Skip)
   const skipBreak = () => {
     setIsActive(false);
     setMode('FOCUS');
     setTimeLeft(DURATION.FOCUS);
-    stopMusic(); // Matikan musik perayaan jika di-skip
+    stopMusic();
   };
 
   const clearTaskTimeLog = () => setTaskTimeLog({});

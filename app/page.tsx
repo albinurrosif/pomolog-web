@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Timer, BarChart3, ListChecks, ArrowRight, BrainCircuit, Coffee, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import TutorialSheet from './components/TutorialSheet';
 
 export default function LandingPage() {
   return (
@@ -14,12 +15,13 @@ export default function LandingPage() {
           <span className="font-bold text-xl tracking-widest uppercase hidden sm:block">Pomolog</span>
         </div>
         <nav className="flex items-center gap-3 sm:gap-4">
+          <TutorialSheet />
           <Link href="/login" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors">
             Masuk
           </Link>
-          <Link href="/login">
-            <Button className="font-bold rounded-full px-4 sm:px-6 shadow-lg shadow-primary/20">Mulai Gratis</Button>
-          </Link>
+          <Button asChild className="font-bold rounded-full px-4 sm:px-6 shadow-lg shadow-primary/20">
+            <Link href="/login">Mulai Gratis</Link>
+          </Button>
         </nav>
       </header>
 
@@ -46,17 +48,15 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col w-full sm:w-auto sm:flex-row gap-4">
-          <Link href="/login" className="w-full sm:w-auto">
-            <Button size="lg" className="w-full h-14 px-8 text-lg font-bold shadow-xl shadow-primary/25 rounded-full group">
+          <Button asChild size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-bold shadow-xl shadow-primary/25 rounded-full group">
+            <Link href="/login">
               Coba Pomolog Sekarang
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </Link>
-          <Link href="/dashboard" className="w-full sm:w-auto">
-            <Button variant="outline" size="lg" className="w-full h-14 px-8 text-lg font-bold rounded-full bg-background/50 backdrop-blur-sm border-border hover:bg-muted">
-              Buka Meja Kerja
-            </Button>
-          </Link>
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-bold rounded-full bg-background/50 backdrop-blur-sm border-border hover:bg-muted">
+            <Link href="/dashboard">Buka Meja Kerja</Link>
+          </Button>
         </div>
 
         {/* EDUKASI POMODORO SECTION */}
@@ -169,7 +169,7 @@ export default function LandingPage() {
               Source Code
             </a>
 
-            <span className='text-primary'>•</span>
+            <span className="text-primary">•</span>
 
             <Link href="/privacy-policy" className="hover:text-primary">
               Privacy
