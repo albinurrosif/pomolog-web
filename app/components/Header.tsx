@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { Button } from '@/components/ui/button';
+import TutorialSheet from './TutorialSheet';
 
 export default function Header() {
   const pathname = usePathname();
@@ -47,6 +48,7 @@ export default function Header() {
 
         {/* TOMBOL AKSI */}
         <div className="flex items-center gap-4">
+          <TutorialSheet />
           {/* Menggunakan Shadcn Button Variant Ghost */}
           <Button variant="ghost" size="sm" onClick={handleLogout} className="text-neutral-400 hover:text-red-400 hover:bg-red-500/10 font-bold tracking-wide text-xs">
             LOGOUT

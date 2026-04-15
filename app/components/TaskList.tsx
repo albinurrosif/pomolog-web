@@ -39,7 +39,6 @@ export default function TaskList({ tasks, activeTaskId, onAddTask, onSelectTask,
       toast.error('Judul task tidak boleh kosong!');
       return;
     }
-    if (!title) return;
 
     const isSuccess = await onAddTask(title, description);
     if (isSuccess) {
